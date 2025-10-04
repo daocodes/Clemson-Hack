@@ -1,3 +1,4 @@
+import datetime
 import os
 from flask import Flask, render_template, request, jsonify
 from google import genai
@@ -50,6 +51,7 @@ def index():
 @app.route("/describe")
 def describe():
     polarization = request.args.get("polarization", "VV")
+    print(datetime.datetime.now().strftime("%d/%m/%Y, %H:%M:%S"))
     mode = request.args.get("mode", "IW")
     prompt = f"Describe a Sentinel-1 SAR image with polarization {polarization} in mode {mode}."
     try:
@@ -62,7 +64,15 @@ def describe():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"description": f"Error generating Gemini description: {str(e)}"})
+        print(jsonify({"description": f"Error generating Gemini description: {str(e)}"}))
+
+@app.route("/clicked")
+def clicked():
+    lat = request.args.get("lat")
+    lng = request.args.get("lng")
+    return jsonify({lat,lng})
+    
+
 
 if __name__ == "__main__":
     app.run(debug=True)
