@@ -1,11 +1,152 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="utf-8" />
+  <title>Historical Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- MapLibre CSS from CDN -->
+  <link
+    href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+  <!-- Tailwind CDN for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    .map-popup-marker {
+      width: 12px; height: 12px; background: #ff4d4f; border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(255,77,79,0.25);
+    }
+    .control-panel { z-index: 1000; }
+  </style>
 </head>
-<body>
-    
+<body class="h-full">
+
+  <div class="flex h-full">
+    <div id="map" class="flex-1"></div>
+
+    <!-- small control panel -->
+    <div class="absolute top-4 left-4 control-panel">
+      <div class="bg-white/90 rounded-md p-3 shadow">
+        <div class="font-bold mb-2">SAR / Map Controls</div>
+        <label class="flex items-center gap-2">
+          <input id="toggle" type="checkbox" checked />
+          <span>Show SAR Layer</span>
+        </label>
+        <div class="mt-2">
+          <label class="text-xs">Opacity</label>
+          <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.75" />
+        </div>
+        <div class="mt-2">
+          <button id="centerBtn" class="px-3 py-1 bg-blue-600 text-white rounded">Center Home</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MapLibre JS -->
+  <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+  <script>
+    // Replace with your SAR tile URL or OSM for testing
+    const SAR_TILE_URL = "{{ tile_url or 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png' }}";
+
+    // lat/lng passed from Flask (if any)
+    const LAT_FROM_SERVER = "{{ lat if lat is not none else '' }}";
+    const LNG_FROM_SERVER = "{{ lng if lng is not none else '' }}";
+
+    // defaults
+    const HOME = { lng: -90.0715, lat: 29.9511, zoom: 12 };
+
+    function parseCoord(val) {
+      if (!val && val !== 0) return null;
+      const f = parseFloat(val);
+      return Number.isFinite(f) ? f : null;
+    }
+
+    const latVal = parseCoord(LAT_FROM_SERVER);
+    const lngVal = parseCoord(LNG_FROM_SERVER);
+
+    const initialCenter =
+      latVal !== null && lngVal !== null ? [lngVal, latVal] : [HOME.lng, HOME.lat];
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          base: {
+            type: 'raster',
+            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256
+          }
+        },
+        layers: [{ id: 'base', type: 'raster', source: 'base' }]
+      },
+      center: initialCenter,
+      zoom: HOME.zoom
+    });
+
+    // Add controls
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+    const geo = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      showUserLocation: true
+    });
+    map.addControl(geo, 'top-right');
+
+    // When map loads, add SAR raster source & layer
+    map.on('load', () => {
+      try {
+        map.addSource('sar-tiles', { type: 'raster', tiles: [SAR_TILE_URL], tileSize: 256 });
+        map.addLayer({
+          id: 'sar-layer',
+          type: 'raster',
+          source: 'sar-tiles',
+          paint: { 'raster-opacity': 0.75 }
+        });
+      } catch (err) {
+        console.warn('Could not add SAR layer:', err);
+      }
+
+      // ensure map is resized and centered correctly
+      setTimeout(() => {
+        map.resize();
+        if (latVal !== null && lngVal !== null) {
+          map.setCenter([lngVal, latVal]);
+          map.flyTo({ center: [lngVal, latVal], zoom: HOME.zoom });
+        }
+      }, 250);
+    });
+
+    // click => popup + marker
+    map.on('click', (e) => {
+      const { lat, lng } = e.lngLat;
+      const popupHTML = `
+        <b>Lng:</b> ${lng.toFixed(5)}<br/>
+        <b>Lat:</b> ${lat.toFixed(5)}<br/><br/>
+        <a href="/analysis?lat=${lat}&lng=${lng}" target="_blank">
+          Go to Analysis Page
+        </a>`;
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(popupHTML)
+        .addTo(map);
+    });
+
+    // control handlers
+    document.getElementById('toggle').addEventListener('change', (ev) => {
+      const vis = ev.target.checked ? 'visible' : 'none';
+      if (map.getLayer('sar-layer')) map.setLayoutProperty('sar-layer', 'visibility', vis);
+    });
+    document.getElementById('opacity').addEventListener('input', (ev) => {
+      const v = parseFloat(ev.target.value);
+      if (map.getLayer('sar-layer')) map.setPaintProperty('sar-layer', 'raster-opacity', v);
+    });
+    document.getElementById('centerBtn').addEventListener('click', () => {
+      map.flyTo({ center: [HOME.lng, HOME.lat], zoom: HOME.zoom });
+    });
+  </script>
 </body>
 </html>
