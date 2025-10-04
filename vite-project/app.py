@@ -44,11 +44,10 @@ def get_tile_url(lat, lng, polarization="VV", mode="IW"):
 
     # Earth Engine expects [lon, lat]
     point = ee.Geometry.Point([lng_f, lat_f])
-
     collection = (
         ee.ImageCollection("COPERNICUS/S1_GRD")
         .filterBounds(point)
-        .filterDate("2023-06-01", "2023-06-30")
+         .filterDate("2023-06-01", "2023-06-30")
         .filter(ee.Filter.eq("instrumentMode", mode))
         .filter(ee.Filter.listContains("transmitterReceiverPolarisation", polarization))
     )
@@ -101,6 +100,7 @@ def analysis():
         mode=mode,
         message=message,
     )
+
 
 
 @app.route("/describe", methods=["GET"])
