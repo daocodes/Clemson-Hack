@@ -81,8 +81,8 @@ By detecting **persistent moisture anomalies**, **reduced coherence**, or **prog
 
 ```mermaid
 graph LR
-A[Sentinel-1 SAR Data] --> B[Preprocessing & Speckle Filtering]
-B --> C[Polarimetric Decomposition]
-C --> D[Change Detection & Time-Series Analysis]
-D --> E[Damage Severity Index Mapping]
-E --> F[Integration into ArcGIS/QGIS Platforms]ntegration existing technologies into one central ecosystem, much like NASA's FIRMs for fire detection or CEMS for general disasters, which truly embody the spirit of this project. SARMaps has great potential for impact, especially in low-development, low-infrastructure environments. This potential for impact is precisely why SARMaps expansion and integration into existing mapping and emergency software is an essential next step to mitigating environmental lapses like in Ecuador and the world.
+    A[Sentinel-1 SAR Data] --> B[Preprocessing & Speckle Filtering]
+    B --> C[Polarimetric Decomposition]
+    C --> D[Change Detection & Time-Series Analysis]
+    D --> E[Damage Severity Index Mapping]
+    E --> F[Integration into ArcGIS/QGIS Platforms]
