@@ -73,12 +73,6 @@ def describe():
         print(f"Error: {e}")
         return jsonify({"description": f"Error generating description: {e}"})
 
-@app.route("/clicked")
-def clicked():
-    lat = request.args.get("lat")
-    lng = request.args.get("lng")
-    return jsonify({lat,lng})
-    
 
 
 @app.route("/clicked")
