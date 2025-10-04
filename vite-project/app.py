@@ -1,5 +1,4 @@
 import datetime
-import os
 from flask import Flask, render_template, request, jsonify
 from google import genai
 import ee
@@ -7,9 +6,7 @@ import ee
 app = Flask(__name__)
 
 ee.Initialize(project='lucid-fountain-466101-v0')
-
 client = genai.Client(api_key="AIzaSyDjN3wQtKA3BWuQVyeQSJdMwui7kao4-Rg")
-
 MODEL_NAME = "gemini-2.5-flash"
 
 def get_tile_url(polarization="VV", mode="IW"):
@@ -32,6 +29,10 @@ def get_tile_url(polarization="VV", mode="IW"):
         print("Error generating tile URL:", e)
         return None
 
+# Function to return coordinates
+def get_coordinates(lat, lng):
+    return {"lat": lat, "lng": lng}
+
 @app.route("/")
 def index():
     polarization = request.args.get("polarization", "VV")
@@ -51,12 +52,11 @@ def index():
 @app.route("/describe")
 def describe():
     polarization = request.args.get("polarization", "VV")
-    print(datetime.datetime.now().strftime("%d/%m/%Y, %H:%M:%S"))
     mode = request.args.get("mode", "IW")
     prompt = f"Describe a Sentinel-1 SAR image with polarization {polarization} in mode {mode}."
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=MODEL_NAME,
             contents=prompt
         )
         description = response.text
@@ -64,15 +64,17 @@ def describe():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(jsonify({"description": f"Error generating Gemini description: {str(e)}"}))
+        return jsonify({"description": f"Error generating Gemini description: {str(e)}"})
 
 @app.route("/clicked")
 def clicked():
-    lat = request.args.get("lat")
-    lng = request.args.get("lng")
-    return jsonify({lat,lng})
-    
-
+    try:
+        lat = float(request.args.get("lat"))
+        lng = float(request.args.get("lng"))
+        coords = get_coordinates(str(lat), str(lng))
+        return jsonify(coords)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid coordinates"}), 400
 
 if __name__ == "__main__":
     app.run(debug=True)

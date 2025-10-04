@@ -10,7 +10,8 @@
         html, body { margin: 0; padding: 0; height: 100%; }
         #map { width: 100%; height: 60%; }
         #controls { padding: 10px; height: 10%; background: #f0f0f0; }
-        .gemini { height: 30%; padding: 10px; background: #e0e0e0; overflow-y: auto; font-family: sans-serif; }
+        .gemini { height: 25%; padding: 10px; background: #e0e0e0; overflow-y: auto; font-family: sans-serif; }
+        #coords { margin-top: 5px; font-weight: bold; }
         button { margin-left: 10px; }
     </style>
 </head>
@@ -31,6 +32,7 @@
         <button onclick="updateMap()">Update Map</button>
         <button id="describe-btn">Describe SAR Plot</button>
         <span style="margin-left:20px; font-weight:bold;">{{ message }}</span>
+        <div id="coords">Clicked coordinates will appear here</div>
     </div>
 
     <div id="map"></div>
@@ -63,14 +65,21 @@
         var lat = e.latlng.lat;
         var lng = e.latlng.lng;
 
-        alert("Clicked at: " + lat.toFixed(5) + ", " + lng.toFixed(5));
-
         const response = await fetch(`/clicked?lat=${lat}&lng=${lng}`);
         const data = await response.json();
-        console.log("Flask response:", data);
+
+        if(data.lat !== undefined && data.lng !== undefined){
+            document.getElementById('coords').innerText = 
+                "Clicked coordinates: " + data.lat.toFixed(5) + ", " + data.lng.toFixed(5);
+        } else {
+            document.getElementById('coords').innerText = "Error retrieving coordinates";
+        }
+
+        console.log("Coordinates returned by Flask:", data);
     });
 </script>
 
 </body>
 </html>
+
 
