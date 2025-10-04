@@ -1,4 +1,6 @@
 import csv
+import requests
+import json
 
 
 # get registees tuple from csv (email, epsg:3257 tuple)
@@ -46,6 +48,7 @@ def get_registrants(csv_file):
 # Check Function
 def check_coordinates(server_url, x, y):
     """Check if coordinates are dangerous by calling server."""
+    return True
     response = requests.get(f"{server_url}/is_dangerous", params={'x': x, 'y': y})
     return response.json().get('dangerous', False)
 
@@ -62,8 +65,11 @@ def send_danger_alert(notifier, email, x, y):
 
 
 # Poll Function
-def poll_and_notify(csv_file, server_url, smtp_notifier):
+def poll_and_notify(csv_file, server_url):
     """Run through all registrants and notify if in danger zone."""
+    with open('./secrets.json') as file:
+        d = json.load(file)
+    smtp_notifier = SMTPNotifier("smtp.gmail.com", 587, d['email_user'], d['email_pwd'])
     registrants = get_registrants(csv_file)
     
     for email, (x, y) in registrants:

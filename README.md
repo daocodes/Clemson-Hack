@@ -90,6 +90,7 @@ source venv/Scripts/activate
 pip install -r requirements.txt
 py app.py
 ```
+![](./alert-email.png)
 ---
 
 ## 📊 Analytical Workflow
