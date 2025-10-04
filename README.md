@@ -76,21 +76,6 @@ Using **time-series SAR analysis**, SARMaps highlights high-risk zones along:
 By detecting **persistent moisture anomalies**, **reduced coherence**, or **progressive backscatter decline**, the system can flag **infrastructure sections likely to fail**, allowing **preventive maintenance and policy intervention**.
 
 ---
-```bash
-git clone https://github.com/daocodes/Clemson-Hack
-cd Clemson-Hack/vite-project
-python -m venv venv
-# for mac
-source venv/Scripts/activate
-# for powershell
-.\venv\Scripts\activate.ps1
-# for cmd
-.\venv\Scripts\activate.bat
-
-pip install -r requirements.txt
-py app.py
-```
----
 
 ## 📊 Analytical Workflow
 
@@ -101,4 +86,3 @@ graph LR
     C --> D[Change Detection & Time-Series Analysis]
     D --> E[Damage Severity Index Mapping]
     E --> F[Integration into ArcGIS/QGIS Platforms]
-
