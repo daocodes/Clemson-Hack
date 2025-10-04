@@ -1,0 +1,42 @@
+{
+  "hash": "a9a26927",
+  "configHash": "468205bc",
+  "lockfileHash": "57ed8305",
+  "browserHash": "35d24e14",
+  "optimized": {
+    "maplibre-gl": {
+      "src": "../../node_modules/maplibre-gl/dist/maplibre-gl.js",
+      "file": "maplibre-gl.js",
+      "fileHash": "d5606135",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "ad18adb6",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "9733e73a",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "7385bda5",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-BUQ4IUO0": {
+      "file": "chunk-BUQ4IUO0.js",
+      "isDynamicEntry": false
+    },
+    "react-uzBv2_E9": {
+      "file": "react-uzBv2_E9.js",
+      "isDynamicEntry": false
+    }
+  }
+}

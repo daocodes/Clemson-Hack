@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentinel-1 SAR Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; }
+        #map { width: 100%; height: 60%; }
+        #controls { padding: 10px; height: 10%; background: #f0f0f0; }
+        .gemini { height: 30%; padding: 10px; background: #e0e0e0; overflow-y: auto; font-family: sans-serif; }
+        button { margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        Polarization:
+        <select id="polarization">
+            <option value="VV" {% if polarization=='VV' %}selected{% endif %}>VV</option>
+            <option value="VH" {% if polarization=='VH' %}selected{% endif %}>VH</option>
+        </select>
+
+        Mode:
+        <select id="mode">
+            <option value="IW" {% if mode=='IW' %}selected{% endif %}>IW</option>
+            <option value="EW" {% if mode=='EW' %}selected{% endif %}>EW</option>
+        </select>
+
+        <button onclick="updateMap()">Update Map</button>
+        <button id="describe-btn">Describe SAR Plot</button>
+        <span style="margin-left:20px; font-weight:bold;">{{ message }}</span>
+    </div>
+
+    <div id="map"></div>
+    <div id="gemini-wrapper" class="gemini">Click "Describe SAR Plot" to get a description.</div>
+
+    <script>
+        var map = L.map('map').setView([29.9511, -90.0715], 9);
+
+        var sarLayer = L.tileLayer("{{ tile_url }}", {
+            attribution: "Sentinel-1 SAR",
+            maxZoom: 22
+        }).addTo(map);
+
+        function updateMap() {
+            var pol = document.getElementById('polarization').value;
+            var mode = document.getElementById('mode').value;
+
+
+            window.location.href = `/?polarization=${pol}&mode=${mode}`;
+        }
+
+        document.getElementById('describe-btn').addEventListener('click', async function() {
+            var pol = document.getElementById('polarization').value;
+            var mode = document.getElementById('mode').value;
+
+            const response = await fetch(`/describe?polarization=${pol}&mode=${mode}`);
+            const data = await response.json();
+            document.getElementById('gemini-wrapper').innerText = data.description;
+        });
+    </script>
+</body>
+</html>
