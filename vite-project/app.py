@@ -1,12 +1,17 @@
 import datetime
+import os
 from flask import Flask, render_template, request, jsonify
 from google import genai
 import ee
 
 app = Flask(__name__)
+PROJECT_ID = "deft-cove-474115-j1"
+API_KEY = "AIzaSyDjN3wQtKA3BWuQVyeQSJdMwui7kao4-Rg"
 
-ee.Initialize(project='lucid-fountain-466101-v0')
-client = genai.Client(api_key="AIzaSyDjN3wQtKA3BWuQVyeQSJdMwui7kao4-Rg")
+ee.Initialize(project=PROJECT_ID)
+
+client = genai.Client(api_key=API_KEY)
+
 MODEL_NAME = "gemini-2.5-flash"
 
 def get_tile_url(polarization="VV", mode="IW"):
@@ -49,22 +54,32 @@ def index():
         message=message,
     )
 
-@app.route("/describe")
+@app.route("/describe", methods=["GET"])
 def describe():
     polarization = request.args.get("polarization", "VV")
     mode = request.args.get("mode", "IW")
+    print(f"[{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}] Request: polarization={polarization}, mode={mode}")
+    
     prompt = f"Describe a Sentinel-1 SAR image with polarization {polarization} in mode {mode}."
+    
     try:
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt
         )
-        description = response.text
-        return jsonify({"description": description})
+        return jsonify({"description": response.text})
+    
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"description": f"Error generating Gemini description: {str(e)}"})
+        print(f"Error: {e}")
+        return jsonify({"description": f"Error generating description: {e}"})
+
+@app.route("/clicked")
+def clicked():
+    lat = request.args.get("lat")
+    lng = request.args.get("lng")
+    return jsonify({lat,lng})
+    
+
 
 @app.route("/clicked")
 def clicked():
