@@ -1,11 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.tailwindcss.com"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
 </head>
 <body>
+
+
+      <div class="max-w-2xl mx-auto mt-6 p-4 bg-white shadow rounded">
+        <form method="get" action="/" class="space-y-4">
+            <div>
+            <label for="year" class="block text-sm font-medium text-gray-700">Year</label>
+            <input id="year" name="year" type="range" min="2015" max="2023" value="{{ year }}" class="w-full" oninput="yearOutput.value = year.value">
+            <output id="yearOutput" class="block text-center text-gray-600">{{ year }}</output>
+            </div>
+
+            <div>
+            <label for="month" class="block text-sm font-medium text-gray-700">Month</label>
+            <input id="month" name="month" type="range" min="1" max="12" value="{{ month }}" class="w-full" oninput="monthOutput.value = month.value.padStart(2, '0')">
+            <output id="monthOutput" class="block text-center text-gray-600">{{ month }}</output>
+            </div>
+
+            <!-- Polarization and mode dropdowns could go here if needed -->
+
+            <button type="submit" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            Update Date
+            </button>
+        </form>
+        </div>
+
+
+    <script>
+        // Pad single-digit months with 0
+        const monthSlider = document.getElementById('month');
+        const monthOutput = document.getElementById('monthOutput');
+        if (monthSlider && monthOutput) {
+            monthOutput.textContent = monthSlider.value.padStart(2, '0');
+            monthSlider.oninput = () => {
+            monthOutput.textContent = monthSlider.value.padStart(2, '0');
+            };
+        }
+    </script>
     
 </body>
 </html>
