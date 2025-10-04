@@ -77,6 +77,20 @@ By detecting **persistent moisture anomalies**, **reduced coherence**, or **prog
 
 ---
 
+```bash
+git clone https://github.com/daocodes/Clemson-Hack
+cd Clemson-Hack/vite-project
+python -m venv venv
+# for mac
+source venv/Scripts/activate
+# for powershell
+.\venv\Scripts\activate.ps1
+# for cmd
+.\venv\Scripts\activate.bat
+pip install -r requirements.txt
+py app.py
+```
+
 ## 📊 Analytical Workflow
 
 ```mermaid
