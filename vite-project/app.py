@@ -5,7 +5,7 @@ from google import genai
 import ee
 
 app = Flask(__name__)
-PROJECT_ID = "lucid-fountain-466101-v0"
+PROJECT_ID = "deft-cove-474115-j1"
 API_KEY = "AIzaSyDjN3wQtKA3BWuQVyeQSJdMwui7kao4-Rg"
 
 ee.Initialize(project=PROJECT_ID)
