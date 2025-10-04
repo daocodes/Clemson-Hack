@@ -36,30 +36,41 @@
     <div id="map"></div>
     <div id="gemini-wrapper" class="gemini">Click "Describe SAR Plot" to get a description.</div>
 
-    <script>
-        var map = L.map('map').setView([29.9511, -90.0715], 9);
+<script>
+    var map = L.map('map').setView([29.9511, -90.0715], 9);
 
-        var sarLayer = L.tileLayer("{{ tile_url }}", {
-            attribution: "Sentinel-1 SAR",
-            maxZoom: 22
-        }).addTo(map);
+    var sarLayer = L.tileLayer("{{ tile_url }}", {
+        attribution: "Sentinel-1 SAR",
+        maxZoom: 22
+    }).addTo(map);
 
-        function updateMap() {
-            var pol = document.getElementById('polarization').value;
-            var mode = document.getElementById('mode').value;
+    function updateMap() {
+        var pol = document.getElementById('polarization').value;
+        var mode = document.getElementById('mode').value;
+        window.location.href = `/?polarization=${pol}&mode=${mode}`;
+    }
 
+    document.getElementById('describe-btn').addEventListener('click', async function() {
+        var pol = document.getElementById('polarization').value;
+        var mode = document.getElementById('mode').value;
 
-            window.location.href = `/?polarization=${pol}&mode=${mode}`;
-        }
+        const response = await fetch(`/describe?polarization=${pol}&mode=${mode}`);
+        const data = await response.json();
+        document.getElementById('gemini-wrapper').innerText = data.description;
+    });
 
-        document.getElementById('describe-btn').addEventListener('click', async function() {
-            var pol = document.getElementById('polarization').value;
-            var mode = document.getElementById('mode').value;
+    map.on('click', async function(e) {
+        var lat = e.latlng.lat;
+        var lng = e.latlng.lng;
 
-            const response = await fetch(`/describe?polarization=${pol}&mode=${mode}`);
-            const data = await response.json();
-            document.getElementById('gemini-wrapper').innerText = data.description;
-        });
-    </script>
+        alert("Clicked at: " + lat.toFixed(5) + ", " + lng.toFixed(5));
+
+        const response = await fetch(`/clicked?lat=${lat}&lng=${lng}`);
+        const data = await response.json();
+        console.log("Flask response:", data);
+    });
+</script>
+
 </body>
 </html>
+
