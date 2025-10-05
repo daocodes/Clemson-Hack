@@ -69,6 +69,7 @@
     }
   </style>
 </head>
+
 <body class="min-h-screen bg-gray-50 text-gray-900 font-sans">
 
   <!-- Sticky header -->
@@ -253,56 +254,134 @@
     // ---------------- Load incident points for topo map ----------------
     const incidentMarkers = [];
 
-    function loadIncidents() {
-      Papa.parse('/incidents.csv', {
-        download: true,
-        header: true,
-        complete: function(results) {
-          const incidents = results.data.filter(row => {
-            const lat = parseFloat(row.lat);
-            const lon = parseFloat(row.lon);
-            return !isNaN(lat) && !isNaN(lon);
-          });
-
-          console.log(`Loaded ${incidents.length} incidents for topographical map`);
-
-          incidents.forEach(incident => {
-            const lat = parseFloat(incident.lat);
-            const lon = parseFloat(incident.lon);
-
-            // Create custom marker icon
-            const customIcon = L.divIcon({
-              html: '<div class="incident-marker"></div>',
-              className: '',
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
-            });
-
-            // Create popup content
-            const popupHTML = `
-              <div style="min-width: 200px; max-width: 280px;">
-                <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${incident.name || 'Unnamed Incident'}</div>
-                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">${incident.location || 'Unknown location'}</div>
-                <div style="font-size: 11px; margin-bottom: 3px;"><strong>Date:</strong> ${incident.open_date || 'Unknown'}</div>
-                ${incident.commodity ? `<div style="font-size: 11px; margin-bottom: 3px;"><strong>Commodity:</strong> ${incident.commodity}</div>` : ''}
-                ${incident.max_ptl_release_gallons ? `<div style="font-size: 11px; margin-bottom: 3px;"><strong>Max Release:</strong> ${incident.max_ptl_release_gallons} gal</div>` : ''}
-                ${incident.description ? `<div style="font-size: 11px; margin-top: 6px; max-height: 60px; overflow-y: auto;">${incident.description.substring(0, 150)}${incident.description.length > 150 ? '...' : ''}</div>` : ''}
-              </div>
-            `;
-
-            // Create marker with popup - add only to topo map
-            const marker = L.marker([lat, lon], { icon: customIcon })
-              .bindPopup(popupHTML, { maxWidth: 300 })
-              .addTo(topoMap);
-
-            incidentMarkers.push(marker);
-          });
-        },
-        error: function(error) {
-          console.error('Error loading incidents:', error);
-        }
-      });
+function loadIncidents() {
+  // remove any existing markers if this function is re-run
+  try {
+    if (Array.isArray(markers) && markers.length) {
+      markers.forEach(m => { try { m.remove(); } catch(e){} });
+      markers.length = 0;
     }
+  } catch (e) { /* ignore */ }
+
+  Papa.parse('/incidents.csv', {
+    download: true,
+    header: true,
+    complete: function(results) {
+      const rows = results.data || [];
+      const incidents = rows.filter(row => {
+        const lat = parseFloat(row.lat), lon = parseFloat(row.lon);
+        return !isNaN(lat) && !isNaN(lon);
+      });
+
+      document.getElementById('incidentCount').textContent = `${incidents.length} incidents loaded`;
+
+      // gather numeric release values
+      const releases = incidents
+        .map(r => {
+          const v = parseFloat(r.max_ptl_release_gallons);
+          return Number.isFinite(v) ? v : null;
+        })
+        .filter(v => v !== null);
+
+      const minVal = releases.length ? Math.min(...releases) : 0;
+      const maxVal = releases.length ? Math.max(...releases) : 0;
+
+      // optional: if values vary a lot, use log scale (uncomment to use log-scaling)
+      const useLog = false;
+
+      function normalizeValue(v){
+        if (v === null) return 0;
+        if (!useLog) return (v - minVal) / (maxVal - minVal || 1);
+        // log scale between min>0 and max
+        const v2 = Math.max(v, 1);
+        const min2 = Math.max(minVal, 1);
+        return (Math.log(v2) - Math.log(min2)) / (Math.log(Math.max(maxVal,1)) - Math.log(min2) || 1);
+      }
+
+      function valueToColor(v) {
+        if (v === null || !Number.isFinite(v)) return '#9CA3AF'; // gray
+        const t = Math.max(0, Math.min(1, normalizeValue(v)));
+        // hue 120 (green) -> 40 (yellow) -> 0 (red)
+        const hue = 120 - (120 * t);
+        return `hsl(${hue.toFixed(0)},78%,48%)`;
+      }
+
+      // ensure legend exists (or update it)
+      (function ensureLegend(){
+        const control = document.querySelector('.control-panel > div');
+        if (!control) return;
+        let legend = document.getElementById('releaseLegend');
+        if (legend) legend.remove();
+        legend = document.createElement('div');
+        legend.id = 'releaseLegend';
+        legend.className = 'mt-2 text-xs';
+        legend.innerHTML = `
+          <div class="font-medium mb-1">Max release (gal)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="width:28px;height:12px;background:${valueToColor(minVal)};display:inline-block;border-radius:4px;border:1px solid rgba(0,0,0,0.04)"></span>
+            <span style="font-weight:600">${minVal}</span>
+            <span style="margin:0 6px;color:#6b7280">—</span>
+            <span style="font-weight:600">${maxVal}</span>
+          </div>
+        `;
+        control.appendChild(legend);
+      })();
+
+      // create markers
+      incidents.forEach(incident => {
+        const lat = parseFloat(incident.lat), lon = parseFloat(incident.lon);
+        const rawVal = parseFloat(incident.max_ptl_release_gallons);
+        const val = Number.isFinite(rawVal) ? rawVal : null;
+
+        // element
+        const el = document.createElement('div');
+        el.className = 'incident-marker';
+        el.style.background = valueToColor(val);
+
+        // scale size by value (min 12px -> max 28px)
+        const minSize = 12, maxSize = 28;
+        if (val !== null && maxVal > minVal) {
+          const t = normalizeValue(val);
+          const size = Math.round(minSize + (maxSize - minSize) * t);
+          el.style.width = `${size}px`;
+          el.style.height = `${size}px`;
+          el.style.borderRadius = `${Math.round(size/2)}px`;
+          el.style.border = '2px solid white';
+        } else {
+          // ensure default CSS sizes remain if no numeric value
+          el.style.width = '';
+          el.style.height = '';
+        }
+
+        const popupHTML = `
+          <div class="p-2">
+            <h3 class="font-bold text-sm mb-1">${incident.name || 'Unnamed Incident'}</h3>
+            <p class="text-xs text-gray-600 mb-2">${incident.location || 'Unknown location'}</p>
+            <p class="text-xs mb-1"><b>Date:</b> ${incident.open_date || 'Unknown'}</p>
+            <p class="text-xs mb-1"><b>Threat:</b> ${incident.threat || 'Unknown'}</p>
+            ${incident.commodity ? `<p class="text-xs mb-1"><b>Commodity:</b> ${incident.commodity}</p>` : ''}
+            ${incident.max_ptl_release_gallons ? `<p class="text-xs mb-1"><b>Max Release:</b> ${incident.max_ptl_release_gallons} gal</p>` : ''}
+            ${incident.description ? `<p class="text-xs mt-2 max-h-20 overflow-y-auto">${(incident.description||'').substring(0,200)}${(incident.description||'').length>200?'...':''}</p>` : ''}
+            <a href="/analysis?lat=${lat}&lng=${lon}" class="text-blue-600 text-xs mt-2 inline-block">View Analysis →</a>
+          </div>
+        `;
+
+        const popup = L.popup({ offset: [0, -25], maxWidth: 300 }).setContent(popupHTML);
+        const marker = L.marker([lat, lon], { icon: L.divIcon({ html: el.outerHTML, className: '', iconSize: [el.style.width || '12px', el.style.height || '12px'] }) })
+          .bindPopup(popup)
+          .addTo(topoMap);
+
+        markers.push(marker);
+      });
+    },
+    error: function(err) {
+      console.error('Error loading incidents:', err);
+      document.getElementById('incidentCount').textContent = 'Error loading incidents';
+    }
+  });
+}
+
+
 
     // Load incidents after a short delay to ensure map is ready
     setTimeout(() => {

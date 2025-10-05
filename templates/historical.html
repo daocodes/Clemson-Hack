@@ -2,76 +2,313 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Historical Map</title>
+  <title>Historical Map — with AI Drawer & Mission Panel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <!-- MapLibre CSS from CDN -->
-  <link
-    href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css"
-    rel="stylesheet"
-  />
+  <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+
   <!-- Tailwind CDN for quick styling -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Marked for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     .incident-marker {
-      width: 14px; 
-      height: 14px; 
-      background: #ff4d4f; 
+      width: 14px;
+      height: 14px;
+      background: #ff4d4f;
       border: 2px solid white;
       border-radius: 50%;
       cursor: pointer;
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
-    .incident-marker:hover {
-      transform: scale(1.2);
-    }
+    .incident-marker:hover { transform: scale(1.2); }
+
     .control-panel { z-index: 1000; }
-    .maplibregl-popup-content {
-      max-width: 300px;
+
+    /* --- AI drawer (right) --- */
+    .ai-drawer {
+      position: fixed;
+      right: 0;
+      top: 0;
+      height: 100vh;
+      width: 420px;
+      max-width: 92vw;
+      transform: translateX(100%);
+      transition: transform 320ms cubic-bezier(.2,.9,.2,1);
+      z-index: 13000;
+      display: flex;
+      flex-direction: column;
+      pointer-events: auto;
+    }
+    .ai-drawer.open { transform: translateX(0); }
+
+    .ai-panel {
+      height: 100%;
+      background: rgba(255,255,255,0.78);
+      backdrop-filter: blur(8px) saturate(140%);
+      border-left: 1px solid rgba(0,0,0,0.06);
+      box-shadow: -16px 40px 80px rgba(2,6,23,0.18);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 10px;
+    }
+
+    .small-select { padding:6px 8px; border-radius:8px; border:1px solid rgba(15,23,42,0.06); background: rgba(255,255,255,0.85); }
+
+    .response-box {
+      overflow:auto;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid rgba(2,6,23,0.04);
+      background: rgba(255,255,255,0.82);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      flex:1 1 auto;
+    }
+
+    .drawer-toggle {
+      position: fixed;
+      right: 18px;
+      top: 52vh;
+      z-index: 13100;
+      transform: translateY(-50%);
+      background: linear-gradient(180deg,#0ea5e9,#0369a1);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(2,6,23,0.2);
+      cursor: pointer;
+      display: flex;
+      gap:8px;
+      align-items:center;
+      font-weight:600;
+      border: none;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: rgba(255,255,255,0.95);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* --- Mission pull-up panel (bottom centered) --- */
+    .mission-drawer {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translate(-50%, 110%); /* hidden initially off-screen */
+      width: min(1100px, 94%);
+      max-height: 82vh;
+      z-index: 13200;
+      transition: transform 360ms cubic-bezier(.2,.9,.2,1);
+      pointer-events: none;
+    }
+    .mission-drawer.open { transform: translate(-50%, 0); pointer-events: auto; }
+
+    .mission-panel {
+      border-radius: 16px;
+      background: rgba(255,255,255,0.88);
+      -webkit-backdrop-filter: blur(10px) saturate(140%);
+      backdrop-filter: blur(10px) saturate(140%);
+      border: 1px solid rgba(15,23,42,0.06);
+      box-shadow: 0 12px 40px rgba(2,6,23,0.2);
+      padding: 18px;
+      display:flex;
+      gap:12px;
+      flex-direction: column;
+    }
+    .mission-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .mission-title { font-weight:700; font-size:1.05rem; color:#0f172a; }
+    .mission-body { overflow:auto; max-height:56vh; padding-right:6px; color:#111827; }
+    .mission-actions { display:flex; gap:8px; justify-content:flex-end; padding-top:6px; }
+
+    .mission-handle {
+      width:64px; height:6px; background: rgba(15,23,42,0.06);
+      border-radius:999px; margin: 6px auto 0;
+    }
+
+    /* bottom-left mission toggle */
+    .mission-toggle {
+      position: fixed;
+      left: 18px;
+      bottom: 26px;
+      z-index: 13300;
+      background: rgba(255,255,255,0.92);
+      border-radius: 999px;
+      padding: 10px 14px;
+      box-shadow: 0 8px 24px rgba(2,6,23,0.14);
+      cursor: pointer;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      border: 1px solid rgba(2,6,23,0.04);
+    }
+
+    @media (max-width:700px) {
+      .ai-drawer { width: 100vw; }
+      .mission-drawer { width: 96vw; left: 2vw; transform: translate(0,110%); }
+      .mission-drawer.open { transform: translate(0,0); left: 2vw; }
+      .mission-toggle { left: 12px; bottom: 18px; }
     }
   </style>
 </head>
 <body class="h-full">
 
-  <div class="flex h-full">
-    <div id="map" class="flex-1"></div>
+  <div id="map" class="h-full"></div>
 
-    <!-- small control panel -->
-    <div class="absolute top-4 left-4 control-panel">
-      <div class="bg-white/90 rounded-md p-3 shadow">
-        <div class="font-bold mb-2">SAR / Map Controls</div>
-        <label class="flex items-center gap-2">
-          <input id="toggle" type="checkbox" checked />
-          <span>Show SAR Layer</span>
-        </label>
-        <div class="mt-2">
-          <label class="text-xs">Opacity</label>
-          <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.75" />
-        </div>
-        <div class="mt-2">
-          <button id="centerBtn" class="px-3 py-1 bg-blue-600 text-white rounded">Center Home</button>
-        </div>
-        <div class="mt-2 text-xs text-gray-600">
-          <span id="incidentCount">Loading incidents...</span>
+  <!-- small control panel -->
+  <div class="absolute top-4 left-4 control-panel">
+    <div class="bg-white/90 rounded-md p-3 shadow" style="min-width:220px">
+      <div class="font-bold mb-2">SAR / Map Controls</div>
+
+      <div class="flex gap-2 items-center mb-2">
+        <label class="text-xs">Pol</label>
+        <select id="polarization" class="text-xs rounded border px-2 py-1">
+          <option value="VV">VV</option>
+          <option value="VH">VH</option>
+        </select>
+        <label class="text-xs ml-2">Mode</label>
+        <select id="mode" class="text-xs rounded border px-2 py-1">
+          <option value="IW">IW</option>
+          <option value="EW">EW</option>
+        </select>
+      </div>
+
+      <label class="flex items-center gap-2">
+        <input id="toggle" type="checkbox" checked />
+        <span>Show SAR Layer</span>
+      </label>
+
+      <div class="mt-2">
+        <label class="text-xs">Opacity</label>
+        <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.75" />
+      </div>
+
+      <div class="mt-2 flex gap-2">
+        <button id="centerBtn" class="px-3 py-1 bg-blue-600 text-white rounded">Center Home</button>
+        <button id="describeHere" class="px-3 py-1 bg-emerald-600 text-white rounded ml-auto">Describe Here</button>
+      </div>
+
+      <div class="mt-2 text-xs text-gray-600">
+        <span id="incidentCount">Loading incidents...</span>
+      </div>
+      
+      <div id="releaseLegend" class="mt-2 text-xs" style="display: none;">
+        <div class="font-medium mb-1">Max release (gal)</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="legendMin" style="width:28px;height:12px;background:#9CA3AF;display:inline-block;border-radius:4px;border:1px solid rgba(0,0,0,0.04)"></span>
+          <span id="legendMinVal" style="font-weight:600">0</span>
+          <span style="margin:0 6px;color:#6b7280">—</span>
+          <span id="legendMaxVal" style="font-weight:600">0</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- MapLibre JS -->
-  <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
-  <!-- PapaParse for CSV parsing -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script>
-    // Replace with your SAR tile URL or OSM for testing
-    const SAR_TILE_URL = "{{ tile_url or 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png' }}";
+  <!-- drawer toggle (right) -->
+  <button id="drawerToggle" class="drawer-toggle" aria-expanded="false" aria-controls="aiDrawer">AI • Ask</button>
 
-    // lat/lng passed from Flask (if any)
+  <!-- AI Drawer -->
+  <aside id="aiDrawer" class="ai-drawer" aria-hidden="true" role="dialog" aria-label="AI assistant">
+    <div class="ai-panel" role="document">
+      <div class="drawer-header flex items-center justify-between">
+        <div>
+          <div class="drawer-title font-semibold">Assistant</div>
+          <div class="text-xs text-gray-600" id="drawer-sub">Click on the map or use center; then prompt the model.</div>
+        </div>
+        <div class="drawer-controls">
+          <button id="drawerClose" class="px-2 py-1 rounded-md small-select">Close</button>
+        </div>
+      </div>
+
+      <div class="prompt-area" aria-live="polite">
+        <label class="text-xs text-gray-700">Prompt</label>
+        <textarea id="aiPrompt" placeholder="Ask about SAR changes..." aria-label="AI prompt" class="w-full p-2 rounded-md border"></textarea>
+
+        <div class="flex items-center gap-2">
+          <select id="drawerPol" class="small-select">
+            <option value="VV">VV</option>
+            <option value="VH">VH</option>
+          </select>
+          <select id="drawerMode" class="small-select">
+            <option value="IW">IW</option>
+            <option value="EW">EW</option>
+          </select>
+
+          <button id="sendPrompt" class="px-3 py-1 bg-blue-600 text-white rounded">Send</button>
+          <div id="drawerStatus" aria-hidden="true" style="min-width:36px"></div>
+        </div>
+      </div>
+
+      <div class="response-box" id="drawerResponse" tabindex="0" role="region" aria-label="AI response (Markdown)">
+        <div class="text-sm text-gray-600">No response yet.</div>
+      </div>
+
+      <div class="drawer-footer flex items-center justify-between text-xs text-gray-500">
+        <div>Context: <span id="drawerCoords">none</span></div>
+        <div>
+          <button id="copyResponse" class="px-2 py-1 rounded small-select">Copy</button>
+          <button id="downloadResponse" class="px-2 py-1 rounded small-select">Download</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- mission pull-up panel toggle (bottom-left) -->
+  <button id="missionToggle" class="mission-toggle" aria-expanded="false" aria-controls="missionDrawer">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z"/></svg>
+    <span class="text-sm text-gray-800">Mission</span>
+  </button>
+
+  <!-- mission drawer -->
+  <aside id="missionDrawer" class="mission-drawer" role="dialog" aria-modal="false" aria-labelledby="missionTitle" aria-hidden="true">
+    <div class="mission-panel" role="document">
+      <div class="mission-handle" aria-hidden="true"></div>
+
+      <div class="mission-header">
+        <div>
+          <div id="missionTitle" class="mission-title">Our Mission</div>
+          <div class="text-xs text-gray-500">Why we built this demo and what we hope to achieve</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="missionClose" class="px-3 py-1 rounded-md small-select">Close</button>
+        </div>
+      </div>
+
+      <div id="missionContent" class="mission-body prose">
+        <!-- default fallback content (also used if README fetch fails) -->
+        <h4>Sentinel-1 SAR Viewer</h4>
+        <p>
+          SARMaps is an environmental monitoring demo that uses Sentinel-1 SAR to visualize changes (flooding, vegetation, urban changes).
+        </p>
+        <p><strong>Goals:</strong> Make satellite SAR approachable for non-experts, speed up incident triage, and provide a reproducible pipeline for situational awareness in emergencies.</p>
+        <p class="text-sm text-gray-600">If the README is publicly accessible, this panel will attempt to fetch and render it automatically.</p>
+      </div>
+
+      <div class="mission-actions">
+        <button id="missionLearn" class="px-3 py-1 bg-blue-600 text-white rounded">Learn more</button>
+        <button id="missionClose2" class="px-3 py-1 rounded small-select">Done</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MapLibre + PapaParse -->
+  <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script>
+    // --- Map config ---
+    const SAR_TILE_URL = "{{ tile_url or 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png' }}";
     const LAT_FROM_SERVER = "{{ lat if lat is not none else '' }}";
     const LNG_FROM_SERVER = "{{ lng if lng is not none else '' }}";
 
-    // defaults - centered on USA to show all incidents
     const HOME = { lng: -95.0, lat: 37.0, zoom: 4 };
 
     function parseCoord(val) {
@@ -82,9 +319,7 @@
 
     const latVal = parseCoord(LAT_FROM_SERVER);
     const lngVal = parseCoord(LNG_FROM_SERVER);
-
-    const initialCenter =
-      latVal !== null && lngVal !== null ? [lngVal, latVal] : [HOME.lng, HOME.lat];
+    const initialCenter = latVal !== null && lngVal !== null ? [lngVal, latVal] : [HOME.lng, HOME.lat];
 
     const map = new maplibregl.Map({
       container: 'map',
@@ -103,36 +338,23 @@
       zoom: latVal !== null && lngVal !== null ? 12 : HOME.zoom
     });
 
-    // Add controls
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.addControl(new maplibregl.FullscreenControl(), 'top-right');
-    const geo = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      showUserLocation: true
-    });
+    const geo = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, showUserLocation: true });
     map.addControl(geo, 'top-right');
 
-    // Store markers
+    // state
+    let lastClicked = null;
     const markers = [];
 
-    // When map loads, add SAR raster source & layer
     map.on('load', () => {
       try {
         map.addSource('sar-tiles', { type: 'raster', tiles: [SAR_TILE_URL], tileSize: 256 });
-        map.addLayer({
-          id: 'sar-layer',
-          type: 'raster',
-          source: 'sar-tiles',
-          paint: { 'raster-opacity': 0.75 }
-        });
-      } catch (err) {
-        console.warn('Could not add SAR layer:', err);
-      }
+        map.addLayer({ id: 'sar-layer', type: 'raster', source: 'sar-tiles', paint: { 'raster-opacity': 0.75 } });
+      } catch (err) { console.warn('Could not add SAR layer:', err); }
 
-      // Load and plot incidents
       loadIncidents();
 
-      // ensure map is resized and centered correctly
       setTimeout(() => {
         map.resize();
         if (latVal !== null && lngVal !== null) {
@@ -142,93 +364,91 @@
       }, 250);
     });
 
-    // Function to load incidents from CSV
     function loadIncidents() {
       Papa.parse('/incidents.csv', {
-        download: true,
-        header: true,
+        download: true, header: true,
         complete: function(results) {
           const incidents = results.data.filter(row => {
-            const lat = parseFloat(row.lat);
-            const lon = parseFloat(row.lon);
+            const lat = parseFloat(row.lat), lon = parseFloat(row.lon);
             return !isNaN(lat) && !isNaN(lon);
           });
+          document.getElementById('incidentCount').textContent = `${incidents.length} incidents loaded`;
 
-          document.getElementById('incidentCount').textContent = 
-            `${incidents.length} incidents loaded`;
+          // gather numeric release values
+          const releases = incidents
+            .map(r => {
+              const v = parseFloat(r.max_ptl_release_gallons);
+              return Number.isFinite(v) ? v : null;
+            })
+            .filter(v => v !== null);
+
+          const minVal = releases.length ? Math.min(...releases) : 0;
+          const maxVal = releases.length ? Math.max(...releases) : 0;
+
+          function normalizeValue(v){
+            if (v === null) return 0;
+            return (v - minVal) / (maxVal - minVal || 1);
+          }
+
+          function valueToColor(v) {
+            if (v === null || !Number.isFinite(v)) return '#9CA3AF'; // gray
+            const t = Math.max(0, Math.min(1, normalizeValue(v)));
+            // hue 120 (green) -> 40 (yellow) -> 0 (red)
+            const hue = 120 - (120 * t);
+            return `hsl(${hue.toFixed(0)},78%,48%)`;
+          }
+
+          // Update legend
+          const legend = document.getElementById('releaseLegend');
+          const legendMin = document.getElementById('legendMin');
+          const legendMinVal = document.getElementById('legendMinVal');
+          const legendMaxVal = document.getElementById('legendMaxVal');
+          
+          if (releases.length > 0) {
+            legend.style.display = 'block';
+            legendMin.style.background = valueToColor(minVal);
+            legendMinVal.textContent = minVal.toFixed(0);
+            legendMaxVal.textContent = maxVal.toFixed(0);
+          }
 
           incidents.forEach(incident => {
-            const lat = parseFloat(incident.lat);
-            const lon = parseFloat(incident.lon);
+            const lat = parseFloat(incident.lat), lon = parseFloat(incident.lon);
+            const rawVal = parseFloat(incident.max_ptl_release_gallons);
+            const val = Number.isFinite(rawVal) ? rawVal : null;
             
-            // Create marker element
-            const el = document.createElement('div');
+            const el = document.createElement('div'); 
             el.className = 'incident-marker';
-            
-            // Determine color based on threat type
-            if (incident.threat === 'Oil') {
-              el.style.background = '#ff4d4f';
-            } else if (incident.threat === 'Chemical') {
-              el.style.background = '#ff7a00';
-            } else {
-              el.style.background = '#1890ff';
-            }
+            el.style.background = valueToColor(val);
 
-            // Create popup content
             const popupHTML = `
               <div class="p-2">
                 <h3 class="font-bold text-sm mb-1">${incident.name || 'Unnamed Incident'}</h3>
                 <p class="text-xs text-gray-600 mb-2">${incident.location || 'Unknown location'}</p>
                 <p class="text-xs mb-1"><b>Date:</b> ${incident.open_date || 'Unknown'}</p>
                 <p class="text-xs mb-1"><b>Threat:</b> ${incident.threat || 'Unknown'}</p>
-                ${incident.commodity ? `<p class="text-xs mb-1"><b>Commodity:</b> ${incident.commodity}</p>` : ''}
-                ${incident.max_ptl_release_gallons ? `<p class="text-xs mb-1"><b>Max Release:</b> ${incident.max_ptl_release_gallons} gal</p>` : ''}
-                ${incident.description ? `<p class="text-xs mt-2 max-h-20 overflow-y-auto">${incident.description.substring(0, 200)}${incident.description.length > 200 ? '...' : ''}</p>` : ''}
-                <a href="/analysis?lat=${lat}&lng=${lon}" target="_blank" class="text-blue-600 text-xs mt-2 inline-block">
-                  View Analysis →
-                </a>
-              </div>
-            `;
-
-            // Create popup
-            const popup = new maplibregl.Popup({ 
-              offset: 25,
-              maxWidth: '300px'
-            }).setHTML(popupHTML);
-
-            // Create marker
-            const marker = new maplibregl.Marker({ element: el })
-              .setLngLat([lon, lat])
-              .setPopup(popup)
-              .addTo(map);
-
+                ${incident.description ? `<p class="text-xs mt-2 max-h-20 overflow-y-auto">${incident.description.substring(0,200)}${incident.description.length>200?'...':''}</p>` : ''}
+                <a href="/analysis?lat=${lat}&lng=${lon}" class="text-blue-600 text-xs mt-2 inline-block">View Analysis →</a>
+              </div>`;
+            const popup = new maplibregl.Popup({ offset: 25, maxWidth: '300px' }).setHTML(popupHTML);
+            const marker = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).setPopup(popup).addTo(map);
             markers.push(marker);
           });
         },
-        error: function(error) {
-          console.error('Error loading incidents:', error);
-          document.getElementById('incidentCount').textContent = 
-            'Error loading incidents';
+        error: function(err) {
+          console.error('Error loading incidents:', err);
+          document.getElementById('incidentCount').textContent = 'Error loading incidents';
         }
       });
     }
 
-    // click => popup + marker
     map.on('click', (e) => {
       const { lat, lng } = e.lngLat;
-      const popupHTML = `
-        <b>Lng:</b> ${lng.toFixed(5)}<br/>
-        <b>Lat:</b> ${lat.toFixed(5)}<br/><br/>
-        <a href="/analysis?lat=${lat}&lng=${lng}" target="_blank">
-          Go to Analysis Page
-        </a>`;
-      new maplibregl.Popup()
-        .setLngLat(e.lngLat)
-        .setHTML(popupHTML)
-        .addTo(map);
+      lastClicked = { lat, lng };
+      const popupHTML = `<b>Lng:</b> ${lng.toFixed(5)}<br/><b>Lat:</b> ${lat.toFixed(5)}<br/><br/><a href="/analysis?lat=${lat}&lng=${lng}">Go to Analysis Page</a>`;
+      new maplibregl.Popup().setLngLat(e.lngLat).setHTML(popupHTML).addTo(map);
+      updateDrawerCoords();
     });
 
-    // control handlers
     document.getElementById('toggle').addEventListener('change', (ev) => {
       const vis = ev.target.checked ? 'visible' : 'none';
       if (map.getLayer('sar-layer')) map.setLayoutProperty('sar-layer', 'visibility', vis);
@@ -237,9 +457,154 @@
       const v = parseFloat(ev.target.value);
       if (map.getLayer('sar-layer')) map.setPaintProperty('sar-layer', 'raster-opacity', v);
     });
-    document.getElementById('centerBtn').addEventListener('click', () => {
-      map.flyTo({ center: [HOME.lng, HOME.lat], zoom: HOME.zoom });
+    document.getElementById('centerBtn').addEventListener('click', () => map.flyTo({ center: [HOME.lng, HOME.lat], zoom: HOME.zoom }));
+
+    // Describe Here button opens drawer and pre-fills prompt
+    document.getElementById('describeHere').addEventListener('click', () => {
+      openDrawer();
+      const promptEl = document.getElementById('aiPrompt');
+      if (!promptEl.value.trim()) {
+        promptEl.value = `Summarize likely SAR changes at this location (lat: ${ (lastClicked?.lat ?? map.getCenter().lat).toFixed(4) }, lon: ${ (lastClicked?.lng ?? map.getCenter().lng).toFixed(4) }). Mention flood/vegetation/urban cues.`;
+      }
     });
+
+    // --- Drawer interactions ---
+    const drawer = document.getElementById('aiDrawer');
+    const toggleBtn = document.getElementById('drawerToggle');
+    const closeBtn = document.getElementById('drawerClose');
+    const sendBtn = document.getElementById('sendPrompt');
+    const responseBox = document.getElementById('drawerResponse');
+    const statusEl = document.getElementById('drawerStatus');
+    const drawerCoords = document.getElementById('drawerCoords');
+
+    function updateDrawerCoords() {
+      const lat = lastClicked?.lat ?? map.getCenter().lat;
+      const lng = lastClicked?.lng ?? map.getCenter().lng;
+      drawerCoords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+    updateDrawerCoords();
+
+    function openDrawer() {
+      drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      updateDrawerCoords();
+      setTimeout(()=>document.getElementById('aiPrompt').focus(), 220);
+    }
+    function closeDrawer() {
+      drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    toggleBtn.addEventListener('click', () => { if (drawer.classList.contains('open')) closeDrawer(); else openDrawer(); });
+    closeBtn.addEventListener('click', closeDrawer);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer(); });
+
+    // copy/download helpers
+    document.getElementById('copyResponse').addEventListener('click', () => {
+      const tmp = document.createElement('div'); tmp.innerHTML = responseBox.innerHTML;
+      const txt = tmp.innerText || tmp.textContent || '';
+      navigator.clipboard?.writeText(txt).then(()=>{ alert('Copied to clipboard'); }).catch(()=>{ alert('Copy failed'); });
+    });
+    document.getElementById('downloadResponse').addEventListener('click', () => {
+      const tmp = document.createElement('div'); tmp.innerHTML = responseBox.innerHTML;
+      const txt = tmp.innerText || tmp.textContent || '';
+      const blob = new Blob([txt], { type:'text/plain;charset=utf-8' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_response.txt'; a.click(); URL.revokeObjectURL(a.href);
+    });
+
+    // Send prompt to /describe (GET with query params)
+    sendBtn.addEventListener('click', async () => {
+      const prompt = document.getElementById('aiPrompt').value.trim();
+      const pol = document.getElementById('drawerPol').value || document.getElementById('polarization').value;
+      const mode = document.getElementById('drawerMode').value || document.getElementById('mode').value;
+      const lat = lastClicked?.lat ?? map.getCenter().lat;
+      const lon = lastClicked?.lng ?? map.getCenter().lng;
+
+      if (!prompt) { alert('Write a prompt first (or use the pre-filled prompt).'); return; }
+
+      // UI: spinner
+      statusEl.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
+      sendBtn.disabled = true;
+
+      try {
+        const params = new URLSearchParams({ polarization: pol, mode: mode, lat: String(lat), lon: String(lon), prompt: prompt });
+        const url = `/describe?${params.toString()}`;
+        const res = await fetch(url, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('Describe API error ' + res.status);
+        const json = await res.json();
+        const md = json.description || 'No description returned.';
+        const html = (typeof marked !== 'undefined') ? marked.parse(md) : `<pre>${md}</pre>`;
+        responseBox.innerHTML = html;
+        updateDrawerCoords();
+      } catch (err) {
+        console.error('AI request failed', err);
+        responseBox.innerHTML = `<div style="color:#c00">Error calling AI: ${err.message}</div>`;
+      } finally {
+        statusEl.innerHTML = '';
+        sendBtn.disabled = false;
+      }
+    });
+
+    map.on('moveend', updateDrawerCoords);
+
+    // --- Mission drawer interactions ---
+    const missionToggle = document.getElementById('missionToggle');
+    const missionDrawer = document.getElementById('missionDrawer');
+    const missionClose = document.getElementById('missionClose');
+    const missionClose2 = document.getElementById('missionClose2');
+    const missionLearn = document.getElementById('missionLearn');
+    const missionContent = document.getElementById('missionContent');
+
+    function openMission() {
+      missionDrawer.classList.add('open');
+      missionToggle.setAttribute('aria-expanded', 'true');
+      // attempt fetch README (raw) and render; fallback to existing content
+      const rawUrl = 'https://raw.githubusercontent.com/daocodes/Clemson-Hack/main/README.md';
+      fetch(rawUrl).then(r => {
+        if (!r.ok) throw new Error('Could not fetch README (status ' + r.status + ')');
+        return r.text();
+      }).then(md => {
+        // use marked if available
+        if (typeof marked !== 'undefined') {
+          missionContent.innerHTML = marked.parse(md);
+        } else {
+          missionContent.textContent = md;
+        }
+      }).catch(err => {
+        console.warn('README fetch failed, keeping fallback mission copy', err);
+        // keep fallback content already in DOM
+      });
+    }
+    function closeMission() {
+      missionDrawer.classList.remove('open');
+      missionToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    missionToggle.addEventListener('click', () => { if (missionDrawer.classList.contains('open')) closeMission(); else openMission(); });
+    missionClose.addEventListener('click', closeMission);
+    missionClose2.addEventListener('click', closeMission);
+    missionLearn.addEventListener('click', () => {
+      // example: open GitHub in new tab
+      window.open('https://github.com/daocodes/Clemson-Hack', '_blank');
+    });
+
+    // Make sure map resizes when panels open/close so tiles render
+    const resizeMaps = () => { try { map.resize(); } catch(e){} };
+    ['transitionend','animationend'].forEach(evt => {
+      missionDrawer.addEventListener(evt, () => setTimeout(resizeMaps, 160));
+      drawer.addEventListener(evt, () => setTimeout(resizeMaps, 160));
+    });
+
+    // Accessibility: close on escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (missionDrawer.classList.contains('open')) closeMission();
+        if (drawer.classList.contains('open')) closeDrawer();
+      }
+    });
+
   </script>
 </body>
 </html>
