@@ -59,6 +59,14 @@
       transform: scale(1.3);
       z-index: 1000;
     }
+    .location-marker {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 3px solid #2563eb;
+      background: rgba(37, 99, 235, 0.3);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -333,16 +341,57 @@
     syncMaps(opticalMap, [sarMap, topoMap]);
     syncMaps(topoMap, [sarMap, opticalMap]);
 
+    // ---------------- Auto-update SAR tiles on viewport change ----------------
+    let sarUpdateTimeout = null;
+
+    function onViewportChange() {
+      const center = sarMap.getCenter();
+      const lat = +center.lat.toFixed(5);
+      const lon = +center.lng.toFixed(5);
+
+      // Update current position variables
+      currentLat = lat;
+      currentLon = lon;
+
+      // Update markers to center position
+      sarMarker.setLatLng([lat, lon]);
+      opticalMarker.setLatLng([lat, lon]);
+      topoMarker.setLatLng([lat, lon]);
+
+      // Debounce the SAR tile update to avoid too many requests while panning
+      if (sarUpdateTimeout) {
+        clearTimeout(sarUpdateTimeout);
+      }
+
+      sarUpdateTimeout = setTimeout(() => {
+        updateSARTilesForLocation(lat, lon);
+      }, 1000); // Wait 1 second after user stops panning
+    }
+
+    // Add moveend listeners to all maps to update SAR tiles
+    sarMap.on('moveend', onViewportChange);
+    opticalMap.on('moveend', onViewportChange);
+    topoMap.on('moveend', onViewportChange);
+
     // ---------------- Markers + click-to-explain ----------------
     let currentLat = DEFAULT_CENTER[0];
     let currentLon = DEFAULT_CENTER[1];
 
-    const sarMarker = L.marker(DEFAULT_CENTER).addTo(sarMap);
-    const opticalMarker = L.marker(DEFAULT_CENTER).addTo(opticalMap);
-    const topoMarker = L.marker(DEFAULT_CENTER).addTo(topoMap);
+    // Create blue circle markers for all three maps
+    const blueCircleIcon = L.divIcon({
+      html: '<div class="location-marker"></div>',
+      className: '',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+
+    const sarMarker = L.marker(DEFAULT_CENTER, { icon: blueCircleIcon }).addTo(sarMap);
+    const opticalMarker = L.marker(DEFAULT_CENTER, { icon: blueCircleIcon }).addTo(opticalMap);
+    const topoMarker = L.marker(DEFAULT_CENTER, { icon: blueCircleIcon }).addTo(topoMap);
 
     function setAllViews(lat, lon, zoom = null) {
       const center = [lat, lon];
+      // Update marker positions
       sarMarker.setLatLng(center);
       opticalMarker.setLatLng(center);
       topoMarker.setLatLng(center);
@@ -415,11 +464,55 @@
       const lon = +e.latlng.lng.toFixed(5);
       const zoom = e.target.getZoom();
       setAllViews(lat, lon, zoom);
-      // Don't automatically generate AI overview on map click
+
+      // Update SAR tiles for the new location
+      currentLat = lat;
+      currentLon = lon;
+      updateSARTilesForLocation(lat, lon);
     }
-    sarMap.on('click', onAnyMapClick);
-    opticalMap.on('click', onAnyMapClick);
-    topoMap.on('click', onAnyMapClick);
+
+    async function updateSARTilesForLocation(lat, lon) {
+      const pol = document.getElementById('polarization').value;
+      const mode = document.getElementById('mode').value;
+      const daysFromStart = dateSlider.value;
+
+      try {
+        const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${lat}&lng=${lon}&days_from_start=${encodeURIComponent(daysFromStart)}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          console.error('Failed to fetch tile URL:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.tile_url) {
+          if (sarLayer) {
+            sarMap.removeLayer(sarLayer);
+          }
+
+          sarLayer = L.tileLayer(data.tile_url, {
+            attribution: "Sentinel-1 SAR",
+            maxZoom: 22
+          }).addTo(sarMap);
+
+          console.log('SAR tiles updated for location:', lat, lon, 'date range:', data.start_date, 'to', data.end_date);
+
+          // Update the URL without reloading the page
+          const newUrl = `/?lat=${lat}&lng=${lon}&polarization=${pol}&mode=${mode}&days_from_start=${daysFromStart}`;
+          window.history.pushState({}, '', newUrl);
+
+          // Update footer coordinates
+          document.querySelector('footer p:nth-child(1)').innerHTML = `<strong>Lat:</strong> ${lat}`;
+          document.querySelector('footer p:nth-child(2)').innerHTML = `<strong>Lng:</strong> ${lon}`;
+        } else {
+          console.warn('No SAR data available for this location');
+        }
+      } catch (error) {
+        console.error('Error updating SAR tiles:', error);
+      }
+    }
 
     document.getElementById('describe-btn')?.addEventListener('click', () => {
       describeAt(currentLat, currentLon);
@@ -485,6 +578,10 @@
 
     // Initialize display
     updateDateDisplay();
+
+    // Add click handlers to optical and topo maps to update location
+    opticalMap.on('click', onAnyMapClick);
+    topoMap.on('click', onAnyMapClick);
 
     function updateMap() {
       const pol = document.getElementById('polarization').value;
