@@ -127,7 +127,6 @@ def analysis():
     )
 
 
-
 @app.route("/describe", methods=["GET"])
 def describe():
     polarization = request.args.get("polarization", "VV")
@@ -148,9 +147,9 @@ def describe():
                 text = first.get("content") or first.get("text") or str(first)
             else:
                 text = (
-                    getattr(first, "content", None)
-                    or getattr(first, "text", None)
-                    or str(first)
+                        getattr(first, "content", None)
+                        or getattr(first, "text", None)
+                        or str(first)
                 )
         elif hasattr(response, "output"):
             text = getattr(response, "output")
@@ -280,6 +279,49 @@ def index():
         days_from_start=days_from_start,
         message=message,
     )
+
+
+@app.route("/subscribe", methods=["POST"])
+def subscribe():
+    """Handle subscription requests for location-based alerts."""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        lat = data.get('lat')
+        lon = data.get('lon')
+
+        if not email or '@' not in email:
+            return jsonify({'success': False, 'message': 'Invalid email address'}), 400
+
+        if lat is None or lon is None:
+            return jsonify({'success': False, 'message': 'Invalid coordinates'}), 400
+
+        # Store subscription in CSV file
+        import csv
+        subscribers_file = os.path.join(os.path.dirname(__file__), 'subscribers.csv')
+
+        # Check if file exists, if not create with headers
+        file_exists = os.path.exists(subscribers_file)
+
+        with open(subscribers_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(['email', 'lat', 'lon', 'timestamp'])
+            writer.writerow([email, lat, lon, datetime.datetime.now().isoformat()])
+
+        app.logger.info(f"New subscription: {email} at ({lat}, {lon})")
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully subscribed {email} to alerts for location ({lat}, {lon})'
+        })
+
+    except Exception as e:
+        app.logger.exception("Error processing subscription")
+        return jsonify({
+            'success': False,
+            'message': 'An error occurred while processing your subscription'
+        }), 500
 
 
 if __name__ == "__main__":

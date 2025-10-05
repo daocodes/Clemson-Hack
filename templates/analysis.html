@@ -1,156 +1,193 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sentinel-1 SAR Viewer</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Sentinel-1 SAR Viewer</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- Tailwind CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Marked for markdown -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Marked for markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-  <!-- PapaParse for CSV parsing -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <style>
-    :root { --header-h: 4rem; }
-    header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 10000; }
-    main { padding-top: var(--header-h); }
-    .map-panel {
-      height: calc(60vh - var(--header-h));
-      min-height: 320px;
-      width: 100%;
-      border: 1px solid #e5e7eb;
-      border-radius: 0.5rem;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .map-panel-expanded {
-      height: calc(100vh - var(--header-h) - 3rem);
-      min-height: 320px;
-    }
-    #gemini-wrapper {
-      padding: 1rem;
-      background: #f3f4f6;
-      height: auto;
-      overflow: visible;
-      display: none;
-    }
-    #gemini-wrapper.visible {
-      display: block;
-    }
-    footer { position: relative; }
-    .prose img { max-width: 100%; height: auto; display: block; }
-    .incident-marker {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      border: 2px solid white;
-      cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      background: #ff4d4f;
-    }
-    .incident-marker:hover {
-      transform: scale(1.3);
-      z-index: 1000;
-    }
-    .location-marker {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 3px solid #2563eb;
-      background: rgba(37, 99, 235, 0.3);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-  </style>
+    <style>
+        :root {
+            --header-h: 4rem;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-h);
+            z-index: 10000;
+        }
+
+        main {
+            padding-top: var(--header-h);
+        }
+
+        .map-panel {
+            height: calc(60vh - var(--header-h));
+            min-height: 320px;
+            width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .map-panel-expanded {
+            height: calc(100vh - var(--header-h) - 3rem);
+            min-height: 320px;
+        }
+
+        #gemini-wrapper {
+            padding: 1rem;
+            background: #f3f4f6;
+            height: auto;
+            overflow: visible;
+            display: none;
+        }
+
+        #gemini-wrapper.visible {
+            display: block;
+        }
+
+        footer {
+            position: relative;
+        }
+
+        .prose img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .incident-marker {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background: #ff4d4f;
+        }
+
+        .incident-marker:hover {
+            transform: scale(1.3);
+            z-index: 1000;
+        }
+
+        .location-marker {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 3px solid #2563eb;
+            background: rgba(37, 99, 235, 0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900 font-sans">
 
-  <!-- Sticky header -->
-  <header class="bg-blue-600 text-white shadow z-50">
+<!-- Sticky header -->
+<header class="bg-blue-600 text-white shadow z-50">
     <div class="max-w-screen-xl mx-auto h-full flex items-center gap-4 px-4">
-      <h1 class="text-sm md:text-base font-semibold tracking-wide">Sentinel-1 SAR Viewer</h1>
+        <h1 class="text-sm md:text-base font-semibold tracking-wide">Sentinel-1 SAR Viewer</h1>
 
-      <div class="ml-4 flex items-center gap-3">
-        <div class="flex items-center gap-2 text-sm bg-white text-black rounded px-2 py-1">
-          <label for="polarization" class="font-medium text-xs md:text-sm mr-1">Polarization</label>
-          <select id="polarization" class="border rounded px-2 py-1 text-sm">
-            <option value="VV" {% if polarization=='VV' %}selected{% endif %}>VV</option>
-            <option value="VH" {% if polarization=='VH' %}selected{% endif %}>VH</option>
-          </select>
+        <div class="ml-4 flex items-center gap-3">
+            <div class="flex items-center gap-2 text-sm bg-white text-black rounded px-2 py-1">
+                <label for="polarization" class="font-medium text-xs md:text-sm mr-1">Polarization</label>
+                <select id="polarization" class="border rounded px-2 py-1 text-sm">
+                    <option value="VV" {% if polarization=='VV' %}selected{% endif %}>VV</option>
+                    <option value="VH" {% if polarization=='VH' %}selected{% endif %}>VH</option>
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2 text-sm bg-white text-black rounded px-2 py-1">
+                <label for="mode" class="font-medium text-xs md:text-sm mr-1">Mode</label>
+                <select id="mode" class="border rounded px-2 py-1 text-sm">
+                    <option value="IW" {% if mode=='IW' %}selected{% endif %}>IW</option>
+                    <option value="EW" {% if mode=='EW' %}selected{% endif %}>EW</option>
+                </select>
+            </div>
+
+            <!-- Date slider (replaces date picker) -->
+            <div class="flex flex-col gap-1 text-sm bg-white text-black rounded px-3 py-2 min-w-[200px]">
+                <label for="date-slider" class="font-medium text-xs">Max Date: <span id="slider-date">2025-10-04</span></label>
+                <input id="date-slider" type="range" min="0" max="3164"
+                       value="{{ days_from_start if days_from_start else 3164 }}" class="w-full"/>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="updateMap()"
+                        class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-50 transition text-sm">
+                    Update Map
+                </button>
+                <button id="describe-btn"
+                        class="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 transition">
+                    Describe SAR Plot
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="subscribe()"
+                        class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-50 transition text-sm">
+                    Be Alerted
+                </button>
+            </div>
         </div>
 
-        <div class="flex items-center gap-2 text-sm bg-white text-black rounded px-2 py-1">
-          <label for="mode" class="font-medium text-xs md:text-sm mr-1">Mode</label>
-          <select id="mode" class="border rounded px-2 py-1 text-sm">
-            <option value="IW" {% if mode=='IW' %}selected{% endif %}>IW</option>
-            <option value="EW" {% if mode=='EW' %}selected{% endif %}>EW</option>
-          </select>
+        <div class="ml-auto flex items-center gap-3">
+            <a href="{{ url_for('historical') }}">
+                <button class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-100 transition text-sm">
+                    Home
+                </button>
+            </a>
+            <div class="text-xs md:text-sm text-white/90">{{ message }}</div>
         </div>
-
-        <!-- Date slider (replaces date picker) -->
-        <div class="flex flex-col gap-1 text-sm bg-white text-black rounded px-3 py-2 min-w-[200px]">
-          <label for="date-slider" class="font-medium text-xs">Max Date: <span id="slider-date">2025-10-04</span></label>
-          <input id="date-slider" type="range" min="0" max="3164" value="{{ days_from_start if days_from_start else 3164 }}" class="w-full" />
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button onclick="updateMap()" class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-50 transition text-sm">
-            Update Map
-          </button>
-          <button id="describe-btn" class="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 transition">
-            Describe SAR Plot
-          </button>
-        </div>
-      </div>
-
-      <div class="ml-auto flex items-center gap-3">
-        <a href="{{ url_for('historical') }}">
-          <button class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-100 transition text-sm">
-            Home
-          </button>
-        </a>
-        <div class="text-xs md:text-sm text-white/90">{{ message }}</div>
-      </div>
     </div>
-  </header>
+</header>
 
-  <!-- Main content -->
-  <main>
+<!-- Main content -->
+<main>
     <!-- Three side-by-side maps -->
     <div id="map-container" class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3">
-      <div>
-        <div class="text-center text-xs font-medium mb-1">SAR (Sentinel-1)</div>
-        <div id="map-sar" class="map-panel"></div>
-      </div>
-      <div>
-        <div class="text-center text-xs font-medium mb-1">Optical (NASA GIBS True Color)</div>
-        <div id="map-optical" class="map-panel"></div>
-      </div>
-      <div>
-        <div class="text-center text-xs font-medium mb-1">Topographical (OpenTopoMap)</div>
-        <div id="map-topo" class="map-panel"></div>
-      </div>
+        <div>
+            <div class="text-center text-xs font-medium mb-1">SAR (Sentinel-1)</div>
+            <div id="map-sar" class="map-panel"></div>
+        </div>
+        <div>
+            <div class="text-center text-xs font-medium mb-1">Optical (NASA GIBS True Color)</div>
+            <div id="map-optical" class="map-panel"></div>
+        </div>
+        <div>
+            <div class="text-center text-xs font-medium mb-1">Topographical (OpenTopoMap)</div>
+            <div id="map-topo" class="map-panel"></div>
+        </div>
     </div>
 
     <!-- Gemini output -->
     <div id="gemini-wrapper" class="prose prose-sm max-w-none">
-      Click a map (or "Describe SAR Plot") to get a description.
+        Click a map (or "Describe SAR Plot") to get a description.
     </div>
 
     <!-- Footer -->
     <footer class="px-4 py-3 bg-white text-sm border-t text-gray-700 flex gap-6 items-center">
-      <p class="truncate"><strong>Lat:</strong> {{ lat }}</p>
-      <p class="truncate"><strong>Lng:</strong> {{ lng }}</p>
+        <p class="truncate"><strong>Lat:</strong> {{ lat }}</p>
+        <p class="truncate"><strong>Lng:</strong> {{ lng }}</p>
     </footer>
-  </main>
+</main>
 
-  <script>
+<script>
     // ---------------- Constants and initial values ----------------
     const LAT_FROM_SERVER = parseFloat('{{ lat if lat is not none else 29.9511 }}');
     const LNG_FROM_SERVER = parseFloat('{{ lng if lng is not none else -90.0715 }}');
@@ -164,86 +201,150 @@
     const sliderDate = document.getElementById('slider-date');
     let updateTimeout = null;
 
+    function subscribe() {
+        let elem = document.createElement('div')
+        elem.innerHTML = `
+            <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50" style="z-index: 100000;">
+                <div class="bg-white p-6 rounded-lg shadow-lg text-center max-w-md">
+                    <h2 class="text-2xl font-bold mb-4">Subscribe to Alerts</h2>
+                    <p class="mb-4">Enter your email address to receive alerts when SAR data changes at this location.</p>
+                    <input type="email" id="subscribe-email" class="border p-2 rounded mb-4 w-full" placeholder="Email">
+                    <div class="flex gap-2 justify-center">
+                        <button id="subscribe-submit-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Subscribe</button>
+                        <button id="subscribe-cancel-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(elem);
+
+        // Add event listener for subscribe button
+        document.getElementById('subscribe-submit-btn').addEventListener('click', async () => {
+            const email = document.getElementById('subscribe-email').value;
+
+            if (!email || !email.includes('@')) {
+                alert('Please enter a valid email address');
+                return;
+            }
+
+            try {
+                const response = await fetch('/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: email,
+                        lat: currentLat,
+                        lon: currentLon
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert('Successfully subscribed to alerts!');
+                    document.body.removeChild(elem);
+                } else {
+                    alert(data.message || 'Failed to subscribe. Please try again.');
+                }
+            } catch (error) {
+                console.error('Subscription error:', error);
+                alert('An error occurred. Please try again.');
+            }
+        });
+
+        // Add event listener for cancel button
+        document.getElementById('subscribe-cancel-btn').addEventListener('click', () => {
+            document.body.removeChild(elem);
+        });
+
+        // Close on background click
+        elem.querySelector('.fixed').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                document.body.removeChild(elem);
+            }
+        });
+    }
+
     function daysToDate(days) {
-      const date = new Date(START_DATE);
-      date.setDate(date.getDate() + parseInt(days));
-      return date.toISOString().split('T')[0];
+        const date = new Date(START_DATE);
+        date.setDate(date.getDate() + parseInt(days));
+        return date.toISOString().split('T')[0];
     }
 
     function updateDateDisplay() {
-      const days = dateSlider.value;
-      const endDate = daysToDate(days);
-      sliderDate.textContent = endDate;
+        const days = dateSlider.value;
+        const endDate = daysToDate(days);
+        sliderDate.textContent = endDate;
     }
 
     // ---------------- Build three maps ----------------
     // SAR Map
-    const sarMap = L.map('map-sar', { zoomControl: true, scrollWheelZoom: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    const sarMap = L.map('map-sar', {zoomControl: true, scrollWheelZoom: true}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
     let sarLayer = null;
     {% if tile_url %}
-    sarLayer = L.tileLayer("{{ tile_url }}", { attribution: "Sentinel-1 SAR", maxZoom: 22 }).addTo(sarMap);
+        sarLayer = L.tileLayer("{{ tile_url }}", {attribution: "Sentinel-1 SAR", maxZoom: 22}).addTo(sarMap);
     {% else %}
-    // Add a base layer if no SAR tile available
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap', maxZoom: 19
-    }).addTo(sarMap);
+        // Add a base layer if no SAR tile available
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap', maxZoom: 19
+        }).addTo(sarMap);
     {% endif %}
 
     // Optical Map
-    const opticalMap = L.map('map-optical', { zoomControl: true, scrollWheelZoom: true, minZoom: 2, maxZoom: 9 })
-      .setView(DEFAULT_CENTER, Math.min(DEFAULT_ZOOM, 9));
+    const opticalMap = L.map('map-optical', {zoomControl: true, scrollWheelZoom: true, minZoom: 2, maxZoom: 9})
+        .setView(DEFAULT_CENTER, Math.min(DEFAULT_ZOOM, 9));
     let opticalLayer = null;
 
     // Build a GIBS WMTS URL for a given layer + date
     function gibsUrl(layer, date) {
-      return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
     }
 
     // Static fallback: Sentinel-2 cloudless (EOX)
     const S2CLOUDLESS_URL =
-      "https://tiles.maps.eox.at/wms?service=WMTS&request=GetTile&version=1.0.0" +
-      "&layer=s2cloudless-2020&style=default&tilematrixset=GoogleMapsCompatible" +
-      "&TileMatrix={z}&TileCol={x}&TileRow={y}&format=image/jpeg";
+        "https://tiles.maps.eox.at/wms?service=WMTS&request=GetTile&version=1.0.0" +
+        "&layer=s2cloudless-2020&style=default&tilematrixset=GoogleMapsCompatible" +
+        "&TileMatrix={z}&TileCol={x}&TileRow={y}&format=image/jpeg";
 
     function loadOpticalForDate(dateStr) {
-      if (opticalLayer) {
-        opticalMap.removeLayer(opticalLayer);
-        opticalLayer.off("tileerror");
-      }
-
-      const candidates = [
-        { id: "VIIRS_SNPP_CorrectedReflectance_TrueColor", name: "VIIRS SNPP True Color" },
-        { id: "MODIS_Terra_CorrectedReflectance_TrueColor", name: "MODIS Terra True Color" },
-        { id: "MODIS_Aqua_CorrectedReflectance_TrueColor", name: "MODIS Aqua True Color" },
-      ];
-
-      let idx = 0;
-
-      function tryNext(reason) {
-        if (idx < candidates.length) {
-          const layer = candidates[idx++];
-          const url = gibsUrl(layer.id, dateStr);
-          console.log(`[Optical] Trying ${layer.name} @ ${dateStr}${reason ? " after " + reason : ""}`);
-          opticalLayer = L.tileLayer(url, { attribution: "NASA GIBS", maxZoom: 9 }).addTo(opticalMap);
-
-          opticalLayer.on("tileerror", () => {
+        if (opticalLayer) {
             opticalMap.removeLayer(opticalLayer);
-            tryNext(`tile error on ${layer.name}`);
-          });
-        } else {
-          console.warn("[Optical] All NASA layers failed; falling back to Sentinel-2 cloudless.");
-          opticalLayer = L.tileLayer(S2CLOUDLESS_URL, { attribution: "EOX • Sentinel-2 cloudless", maxZoom: 14 })
-            .addTo(opticalMap);
+            opticalLayer.off("tileerror");
         }
-      }
 
-      tryNext();
+        const candidates = [
+            {id: "VIIRS_SNPP_CorrectedReflectance_TrueColor", name: "VIIRS SNPP True Color"},
+            {id: "MODIS_Terra_CorrectedReflectance_TrueColor", name: "MODIS Terra True Color"},
+            {id: "MODIS_Aqua_CorrectedReflectance_TrueColor", name: "MODIS Aqua True Color"},
+        ];
+
+        let idx = 0;
+
+        function tryNext(reason) {
+            if (idx < candidates.length) {
+                const layer = candidates[idx++];
+                const url = gibsUrl(layer.id, dateStr);
+                console.log(`[Optical] Trying ${layer.name} @ ${dateStr}${reason ? " after " + reason : ""}`);
+                opticalLayer = L.tileLayer(url, {attribution: "NASA GIBS", maxZoom: 9}).addTo(opticalMap);
+
+                opticalLayer.on("tileerror", () => {
+                    opticalMap.removeLayer(opticalLayer);
+                    tryNext(`tile error on ${layer.name}`);
+                });
+            } else {
+                console.warn("[Optical] All NASA layers failed; falling back to Sentinel-2 cloudless.");
+                opticalLayer = L.tileLayer(S2CLOUDLESS_URL, {attribution: "EOX • Sentinel-2 cloudless", maxZoom: 14})
+                    .addTo(opticalMap);
+            }
+        }
+
+        tryNext();
     }
 
     // Topographical Map
-    const topoMap = L.map('map-topo', { zoomControl: true, scrollWheelZoom: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    const topoMap = L.map('map-topo', {zoomControl: true, scrollWheelZoom: true}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
     const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenTopoMap • © OpenStreetMap contributors', maxZoom: 17
+        attribution: '© OpenTopoMap • © OpenStreetMap contributors', maxZoom: 17
     }).addTo(topoMap);
 
     // Initial optical load using the date from the slider
@@ -254,32 +355,32 @@
     const incidentMarkers = [];
 
     function loadIncidents() {
-      Papa.parse('/incidents.csv', {
-        download: true,
-        header: true,
-        complete: function(results) {
-          const incidents = results.data.filter(row => {
-            const lat = parseFloat(row.lat);
-            const lon = parseFloat(row.lon);
-            return !isNaN(lat) && !isNaN(lon);
-          });
+        Papa.parse('/incidents.csv', {
+            download: true,
+            header: true,
+            complete: function (results) {
+                const incidents = results.data.filter(row => {
+                    const lat = parseFloat(row.lat);
+                    const lon = parseFloat(row.lon);
+                    return !isNaN(lat) && !isNaN(lon);
+                });
 
-          console.log(`Loaded ${incidents.length} incidents for topographical map`);
+                console.log(`Loaded ${incidents.length} incidents for topographical map`);
 
-          incidents.forEach(incident => {
-            const lat = parseFloat(incident.lat);
-            const lon = parseFloat(incident.lon);
+                incidents.forEach(incident => {
+                    const lat = parseFloat(incident.lat);
+                    const lon = parseFloat(incident.lon);
 
-            // Create custom marker icon
-            const customIcon = L.divIcon({
-              html: '<div class="incident-marker"></div>',
-              className: '',
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
-            });
+                    // Create custom marker icon
+                    const customIcon = L.divIcon({
+                        html: '<div class="incident-marker"></div>',
+                        className: '',
+                        iconSize: [12, 12],
+                        iconAnchor: [6, 6]
+                    });
 
-            // Create popup content
-            const popupHTML = `
+                    // Create popup content
+                    const popupHTML = `
               <div style="min-width: 200px; max-width: 280px;">
                 <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${incident.name || 'Unnamed Incident'}</div>
                 <div style="font-size: 11px; color: #666; margin-bottom: 8px;">${incident.location || 'Unknown location'}</div>
@@ -290,53 +391,54 @@
               </div>
             `;
 
-            // Create marker with popup - add only to topo map
-            const marker = L.marker([lat, lon], { icon: customIcon })
-              .bindPopup(popupHTML, { maxWidth: 300 })
-              .addTo(topoMap);
+                    // Create marker with popup - add only to topo map
+                    const marker = L.marker([lat, lon], {icon: customIcon})
+                        .bindPopup(popupHTML, {maxWidth: 300})
+                        .addTo(topoMap);
 
-            incidentMarkers.push(marker);
-          });
-        },
-        error: function(error) {
-          console.error('Error loading incidents:', error);
-        }
-      });
+                    incidentMarkers.push(marker);
+                });
+            },
+            error: function (error) {
+                console.error('Error loading incidents:', error);
+            }
+        });
     }
 
     // Load incidents after a short delay to ensure map is ready
     setTimeout(() => {
-      loadIncidents();
+        loadIncidents();
     }, 500);
 
     // Initialize maps in expanded state (no AI panel visible by default)
     const mapPanels = document.querySelectorAll('.map-panel');
     mapPanels.forEach(panel => {
-      panel.classList.add('map-panel-expanded');
+        panel.classList.add('map-panel-expanded');
     });
 
     // Invalidate sizes after a short delay to ensure proper rendering
     setTimeout(() => {
-      sarMap.invalidateSize();
-      opticalMap.invalidateSize();
-      topoMap.invalidateSize();
+        sarMap.invalidateSize();
+        opticalMap.invalidateSize();
+        topoMap.invalidateSize();
     }, 200);
 
     // ---------------- Sync maps ----------------
     function syncMaps(source, targets) {
-      let isSyncing = false;
-      source.on('move', () => {
-        if (isSyncing) return;
-        isSyncing = true;
-        const c = source.getCenter();
-        const z = source.getZoom();
-        targets.forEach(m => {
-          const targetZoom = m === opticalMap ? Math.min(z, 9) : z;
-          m.setView(c, targetZoom, { animate: false });
+        let isSyncing = false;
+        source.on('move', () => {
+            if (isSyncing) return;
+            isSyncing = true;
+            const c = source.getCenter();
+            const z = source.getZoom();
+            targets.forEach(m => {
+                const targetZoom = m === opticalMap ? Math.min(z, 9) : z;
+                m.setView(c, targetZoom, {animate: false});
+            });
+            isSyncing = false;
         });
-        isSyncing = false;
-      });
     }
+
     syncMaps(sarMap, [opticalMap, topoMap]);
     syncMaps(opticalMap, [sarMap, topoMap]);
     syncMaps(topoMap, [sarMap, opticalMap]);
@@ -348,48 +450,48 @@
     const MIN_SAR_FETCH_INTERVAL = 2000; // Minimum 2 seconds between SAR fetches
 
     function onViewportChange() {
-      const center = sarMap.getCenter();
-      const lat = +center.lat.toFixed(5);
-      const lon = +center.lng.toFixed(5);
+        const center = sarMap.getCenter();
+        const lat = +center.lat.toFixed(5);
+        const lon = +center.lng.toFixed(5);
 
-      // Update current position variables
-      currentLat = lat;
-      currentLon = lon;
+        // Update current position variables
+        currentLat = lat;
+        currentLon = lon;
 
-      // Update markers to center position
-      sarMarker.setLatLng([lat, lon]);
-      opticalMarker.setLatLng([lat, lon]);
-      topoMarker.setLatLng([lat, lon]);
+        // Update markers to center position
+        sarMarker.setLatLng([lat, lon]);
+        opticalMarker.setLatLng([lat, lon]);
+        topoMarker.setLatLng([lat, lon]);
 
-      // Debounce the SAR tile update to avoid too many requests while panning
-      if (sarUpdateTimeout) {
-        clearTimeout(sarUpdateTimeout);
-      }
-
-      sarUpdateTimeout = setTimeout(() => {
-        // Check if enough time has passed since last fetch
-        const now = Date.now();
-        const timeSinceLastFetch = now - lastSARFetchTime;
-
-        if (sarFetchInProgress) {
-          console.log('SAR fetch already in progress, skipping...');
-          return;
+        // Debounce the SAR tile update to avoid too many requests while panning
+        if (sarUpdateTimeout) {
+            clearTimeout(sarUpdateTimeout);
         }
 
-        if (timeSinceLastFetch < MIN_SAR_FETCH_INTERVAL) {
-          const remainingTime = MIN_SAR_FETCH_INTERVAL - timeSinceLastFetch;
-          console.log(`Delaying SAR fetch by ${remainingTime}ms to prevent network congestion`);
+        sarUpdateTimeout = setTimeout(() => {
+            // Check if enough time has passed since last fetch
+            const now = Date.now();
+            const timeSinceLastFetch = now - lastSARFetchTime;
 
-          // Schedule the fetch after the minimum interval
-          setTimeout(() => {
-            if (!sarFetchInProgress) {
-              updateSARTilesForLocation(lat, lon);
+            if (sarFetchInProgress) {
+                console.log('SAR fetch already in progress, skipping...');
+                return;
             }
-          }, remainingTime);
-        } else {
-          updateSARTilesForLocation(lat, lon);
-        }
-      }, 1000); // Wait 1 second after user stops panning
+
+            if (timeSinceLastFetch < MIN_SAR_FETCH_INTERVAL) {
+                const remainingTime = MIN_SAR_FETCH_INTERVAL - timeSinceLastFetch;
+                console.log(`Delaying SAR fetch by ${remainingTime}ms to prevent network congestion`);
+
+                // Schedule the fetch after the minimum interval
+                setTimeout(() => {
+                    if (!sarFetchInProgress) {
+                        updateSARTilesForLocation(lat, lon);
+                    }
+                }, remainingTime);
+            } else {
+                updateSARTilesForLocation(lat, lon);
+            }
+        }, 1000); // Wait 1 second after user stops panning
     }
 
     // Add moveend listeners to all maps to update SAR tiles
@@ -403,212 +505,214 @@
 
     // Create blue circle markers for all three maps
     const blueCircleIcon = L.divIcon({
-      html: '<div class="location-marker"></div>',
-      className: '',
-      iconSize: [16, 16],
-      iconAnchor: [8, 8]
+        html: '<div class="location-marker"></div>',
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
     });
 
-    const sarMarker = L.marker(DEFAULT_CENTER, { icon: blueCircleIcon }).addTo(sarMap);
-    const opticalMarker = L.marker(DEFAULT_CENTER, { icon: blueCircleIcon }).addTo(opticalMap);
-    const topoMarker = L.marker(DEFAULT_CENTER, { icon: blueCircleIcon }).addTo(topoMap);
+    const sarMarker = L.marker(DEFAULT_CENTER, {icon: blueCircleIcon}).addTo(sarMap);
+    const opticalMarker = L.marker(DEFAULT_CENTER, {icon: blueCircleIcon}).addTo(opticalMap);
+    const topoMarker = L.marker(DEFAULT_CENTER, {icon: blueCircleIcon}).addTo(topoMap);
 
     function setAllViews(lat, lon, zoom = null) {
-      const center = [lat, lon];
-      // Update marker positions
-      sarMarker.setLatLng(center);
-      opticalMarker.setLatLng(center);
-      topoMarker.setLatLng(center);
+        const center = [lat, lon];
+        // Update marker positions
+        sarMarker.setLatLng(center);
+        opticalMarker.setLatLng(center);
+        topoMarker.setLatLng(center);
 
-      const z = zoom ?? sarMap.getZoom();
-      sarMap.setView(center, z, { animate: false });
-      opticalMap.setView(center, Math.min(z, 9), { animate: false });
-      topoMap.setView(center, z, { animate: false });
+        const z = zoom ?? sarMap.getZoom();
+        sarMap.setView(center, z, {animate: false});
+        opticalMap.setView(center, Math.min(z, 9), {animate: false});
+        topoMap.setView(center, z, {animate: false});
 
-      currentLat = lat;
-      currentLon = lon;
+        currentLat = lat;
+        currentLon = lon;
     }
 
     // Helper function to show/hide and resize maps
     function toggleGeminiPanel(show) {
-      const geminiDiv = document.getElementById('gemini-wrapper');
-      const mapPanels = document.querySelectorAll('.map-panel');
+        const geminiDiv = document.getElementById('gemini-wrapper');
+        const mapPanels = document.querySelectorAll('.map-panel');
 
-      if (show) {
-        geminiDiv.classList.add('visible');
-        mapPanels.forEach(panel => {
-          panel.classList.remove('map-panel-expanded');
-        });
-      } else {
-        geminiDiv.classList.remove('visible');
-        mapPanels.forEach(panel => {
-          panel.classList.add('map-panel-expanded');
-        });
-      }
+        if (show) {
+            geminiDiv.classList.add('visible');
+            mapPanels.forEach(panel => {
+                panel.classList.remove('map-panel-expanded');
+            });
+        } else {
+            geminiDiv.classList.remove('visible');
+            mapPanels.forEach(panel => {
+                panel.classList.add('map-panel-expanded');
+            });
+        }
 
-      // Invalidate map sizes after transition
-      setTimeout(() => {
-        sarMap.invalidateSize();
-        opticalMap.invalidateSize();
-        topoMap.invalidateSize();
-      }, 100);
+        // Invalidate map sizes after transition
+        setTimeout(() => {
+            sarMap.invalidateSize();
+            opticalMap.invalidateSize();
+            topoMap.invalidateSize();
+        }, 100);
     }
 
     async function describeAt(lat, lon) {
-      const pol = document.getElementById('polarization')?.value || 'VV';
-      const mode = document.getElementById('mode')?.value || 'IW';
+        const pol = document.getElementById('polarization')?.value || 'VV';
+        const mode = document.getElementById('mode')?.value || 'IW';
 
-      const geminiDiv = document.getElementById('gemini-wrapper');
-      toggleGeminiPanel(true);
-      geminiDiv.innerHTML = "<em>Generating overview…</em>";
+        const geminiDiv = document.getElementById('gemini-wrapper');
+        toggleGeminiPanel(true);
+        geminiDiv.innerHTML = "<em>Generating overview…</em>";
 
-      try {
-        const params = new URLSearchParams({
-          polarization: pol,
-          mode,
-          lat: String(lat),
-          lon: String(lon)
-        });
-        const res = await fetch(`/describe?${params.toString()}`);
-        if (!res.ok) throw new Error(`Describe API returned ${res.status}`);
-        const data = await res.json();
+        try {
+            const params = new URLSearchParams({
+                polarization: pol,
+                mode,
+                lat: String(lat),
+                lon: String(lon)
+            });
+            const res = await fetch(`/describe?${params.toString()}`);
+            if (!res.ok) throw new Error(`Describe API returned ${res.status}`);
+            const data = await res.json();
 
-        geminiDiv.innerHTML = marked.parse(data.description || "No description available.");
-        setTimeout(() => {
-          sarMap.invalidateSize(); opticalMap.invalidateSize(); topoMap.invalidateSize();
-        }, 120);
-      } catch (err) {
-        console.error(err);
-        geminiDiv.textContent = "Error fetching description.";
-      }
+            geminiDiv.innerHTML = marked.parse(data.description || "No description available.");
+            setTimeout(() => {
+                sarMap.invalidateSize();
+                opticalMap.invalidateSize();
+                topoMap.invalidateSize();
+            }, 120);
+        } catch (err) {
+            console.error(err);
+            geminiDiv.textContent = "Error fetching description.";
+        }
     }
 
     function onAnyMapClick(e) {
-      const lat = +e.latlng.lat.toFixed(5);
-      const lon = +e.latlng.lng.toFixed(5);
-      const zoom = e.target.getZoom();
-      setAllViews(lat, lon, zoom);
+        const lat = +e.latlng.lat.toFixed(5);
+        const lon = +e.latlng.lng.toFixed(5);
+        const zoom = e.target.getZoom();
+        setAllViews(lat, lon, zoom);
 
-      // Update SAR tiles for the new location
-      currentLat = lat;
-      currentLon = lon;
-      updateSARTilesForLocation(lat, lon);
+        // Update SAR tiles for the new location
+        currentLat = lat;
+        currentLon = lon;
+        updateSARTilesForLocation(lat, lon);
     }
 
     async function updateSARTilesForLocation(lat, lon) {
-      // Prevent simultaneous fetches
-      if (sarFetchInProgress) {
-        console.log('SAR fetch already in progress, request ignored');
-        return;
-      }
-
-      sarFetchInProgress = true;
-      const pol = document.getElementById('polarization').value;
-      const mode = document.getElementById('mode').value;
-      const daysFromStart = dateSlider.value;
-
-      try {
-        const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${lat}&lng=${lon}&days_from_start=${encodeURIComponent(daysFromStart)}`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          console.error('Failed to fetch tile URL:', response.status);
-          return;
+        // Prevent simultaneous fetches
+        if (sarFetchInProgress) {
+            console.log('SAR fetch already in progress, request ignored');
+            return;
         }
 
-        const data = await response.json();
+        sarFetchInProgress = true;
+        const pol = document.getElementById('polarization').value;
+        const mode = document.getElementById('mode').value;
+        const daysFromStart = dateSlider.value;
 
-        if (data.success && data.tile_url) {
-          if (sarLayer) {
-            sarMap.removeLayer(sarLayer);
-          }
+        try {
+            const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${lat}&lng=${lon}&days_from_start=${encodeURIComponent(daysFromStart)}`;
+            const response = await fetch(url);
 
-          sarLayer = L.tileLayer(data.tile_url, {
-            attribution: "Sentinel-1 SAR",
-            maxZoom: 22
-          }).addTo(sarMap);
+            if (!response.ok) {
+                console.error('Failed to fetch tile URL:', response.status);
+                return;
+            }
 
-          console.log('SAR tiles updated for location:', lat, lon, 'date range:', data.start_date, 'to', data.end_date);
+            const data = await response.json();
 
-          // Update the URL without reloading the page
-          const newUrl = `/?lat=${lat}&lng=${lon}&polarization=${pol}&mode=${mode}&days_from_start=${daysFromStart}`;
-          window.history.pushState({}, '', newUrl);
+            if (data.success && data.tile_url) {
+                if (sarLayer) {
+                    sarMap.removeLayer(sarLayer);
+                }
 
-          // Update footer coordinates
-          document.querySelector('footer p:nth-child(1)').innerHTML = `<strong>Lat:</strong> ${lat}`;
-          document.querySelector('footer p:nth-child(2)').innerHTML = `<strong>Lng:</strong> ${lon}`;
-        } else {
-          console.warn('No SAR data available for this location');
+                sarLayer = L.tileLayer(data.tile_url, {
+                    attribution: "Sentinel-1 SAR",
+                    maxZoom: 22
+                }).addTo(sarMap);
+
+                console.log('SAR tiles updated for location:', lat, lon, 'date range:', data.start_date, 'to', data.end_date);
+
+                // Update the URL without reloading the page
+                const newUrl = `/?lat=${lat}&lng=${lon}&polarization=${pol}&mode=${mode}&days_from_start=${daysFromStart}`;
+                window.history.pushState({}, '', newUrl);
+
+                // Update footer coordinates
+                document.querySelector('footer p:nth-child(1)').innerHTML = `<strong>Lat:</strong> ${lat}`;
+                document.querySelector('footer p:nth-child(2)').innerHTML = `<strong>Lng:</strong> ${lon}`;
+            } else {
+                console.warn('No SAR data available for this location');
+            }
+        } catch (error) {
+            console.error('Error updating SAR tiles:', error);
+        } finally {
+            // Always clear the flag and update the timestamp when done
+            sarFetchInProgress = false;
+            lastSARFetchTime = Date.now();
         }
-      } catch (error) {
-        console.error('Error updating SAR tiles:', error);
-      } finally {
-        // Always clear the flag and update the timestamp when done
-        sarFetchInProgress = false;
-        lastSARFetchTime = Date.now();
-      }
     }
 
     document.getElementById('describe-btn')?.addEventListener('click', () => {
-      describeAt(currentLat, currentLon);
+        describeAt(currentLat, currentLon);
     });
 
     // ---------------- Update map tiles when slider changes ----------------
     async function updateMapTiles() {
-      if (!hasCoords) {
-        console.log('No coordinates set, skipping tile update');
-        return;
-      }
-
-      const pol = document.getElementById('polarization').value;
-      const mode = document.getElementById('mode').value;
-      const daysFromStart = dateSlider.value;
-
-      try {
-        const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${LAT_FROM_SERVER}&lng=${LNG_FROM_SERVER}&days_from_start=${encodeURIComponent(daysFromStart)}`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          console.error('Failed to fetch tile URL:', response.status);
-          return;
+        if (!hasCoords) {
+            console.log('No coordinates set, skipping tile update');
+            return;
         }
 
-        const data = await response.json();
+        const pol = document.getElementById('polarization').value;
+        const mode = document.getElementById('mode').value;
+        const daysFromStart = dateSlider.value;
 
-        if (data.success && data.tile_url) {
-          if (sarLayer) {
-            sarMap.removeLayer(sarLayer);
-          }
+        try {
+            const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${LAT_FROM_SERVER}&lng=${LNG_FROM_SERVER}&days_from_start=${encodeURIComponent(daysFromStart)}`;
+            const response = await fetch(url);
 
-          sarLayer = L.tileLayer(data.tile_url, {
-            attribution: "Sentinel-1 SAR",
-            maxZoom: 22
-          }).addTo(sarMap);
+            if (!response.ok) {
+                console.error('Failed to fetch tile URL:', response.status);
+                return;
+            }
 
-          console.log('SAR tiles updated for date range:', data.start_date, 'to', data.end_date);
-        } else {
-          console.warn('No tile URL available for selected date range');
+            const data = await response.json();
+
+            if (data.success && data.tile_url) {
+                if (sarLayer) {
+                    sarMap.removeLayer(sarLayer);
+                }
+
+                sarLayer = L.tileLayer(data.tile_url, {
+                    attribution: "Sentinel-1 SAR",
+                    maxZoom: 22
+                }).addTo(sarMap);
+
+                console.log('SAR tiles updated for date range:', data.start_date, 'to', data.end_date);
+            } else {
+                console.warn('No tile URL available for selected date range');
+            }
+        } catch (error) {
+            console.error('Error updating map tiles:', error);
         }
-      } catch (error) {
-        console.error('Error updating map tiles:', error);
-      }
 
-      // Update optical layer based on slider date
-      currentOpticalDate = daysToDate(daysFromStart);
-      loadOpticalForDate(currentOpticalDate);
+        // Update optical layer based on slider date
+        currentOpticalDate = daysToDate(daysFromStart);
+        loadOpticalForDate(currentOpticalDate);
     }
 
     // Update display and tiles when slider moves (debounced)
-    dateSlider.addEventListener('input', function() {
-      updateDateDisplay();
+    dateSlider.addEventListener('input', function () {
+        updateDateDisplay();
 
-      if (updateTimeout) {
-        clearTimeout(updateTimeout);
-      }
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+        }
 
-      updateTimeout = setTimeout(() => {
-        updateMapTiles();
-      }, 500);
+        updateTimeout = setTimeout(() => {
+            updateMapTiles();
+        }, 500);
     });
 
     // Initialize display
@@ -619,21 +723,23 @@
     topoMap.on('click', onAnyMapClick);
 
     function updateMap() {
-      const pol = document.getElementById('polarization').value;
-      const mode = document.getElementById('mode').value;
-      const daysFromStart = document.getElementById('date-slider').value;
-      const latParam = hasCoords ? `&lat=${LAT_FROM_SERVER}` : '';
-      const lngParam = hasCoords ? `&lng=${LNG_FROM_SERVER}` : '';
-      const dateParam = `&days_from_start=${encodeURIComponent(daysFromStart)}`;
-      window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}${dateParam}`;
+        const pol = document.getElementById('polarization').value;
+        const mode = document.getElementById('mode').value;
+        const daysFromStart = document.getElementById('date-slider').value;
+        const latParam = hasCoords ? `&lat=${LAT_FROM_SERVER}` : '';
+        const lngParam = hasCoords ? `&lng=${LNG_FROM_SERVER}` : '';
+        const dateParam = `&days_from_start=${encodeURIComponent(daysFromStart)}`;
+        window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}${dateParam}`;
     }
 
     // ---------------- Window resize: keep maps crisp ----------------
     window.addEventListener('resize', () => {
-      setTimeout(() => {
-        sarMap.invalidateSize(); opticalMap.invalidateSize(); topoMap.invalidateSize();
-      }, 150);
+        setTimeout(() => {
+            sarMap.invalidateSize();
+            opticalMap.invalidateSize();
+            topoMap.invalidateSize();
+        }, 150);
     });
-  </script>
+</script>
 </body>
 </html>

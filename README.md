@@ -23,11 +23,11 @@ SARMaps translates these **complex radar signatures** into **intuitive, actionab
 
 ## 🛰️ SAR Applications and Parameters
 
-| **SAR Parameter** | **Measured Property** | **Ecological Insight** |
-|--------------------|------------------------|------------------------|
-| **Backscatter Intensity (σ₀)** | Surface roughness, moisture, and dielectric constant | Detects **flooded regions**, **soil exposure**, and **biomass loss** |
-| **Polarization (VV, VH)** | Scattering mechanism (surface, volume, or double-bounce) | Differentiates between **healthy canopies (volume scattering)** vs. **oil-contaminated vegetation/soil (double-bounce)** |
-| **Coherence / Interferometry (InSAR)** | Phase stability over time | Identifies **structural changes** in vegetation and land surfaces before visible degradation occurs |
+| **SAR Parameter**                      | **Measured Property**                                    | **Ecological Insight**                                                                                                   |
+|----------------------------------------|----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| **Backscatter Intensity (σ₀)**         | Surface roughness, moisture, and dielectric constant     | Detects **flooded regions**, **soil exposure**, and **biomass loss**                                                     |
+| **Polarization (VV, VH)**              | Scattering mechanism (surface, volume, or double-bounce) | Differentiates between **healthy canopies (volume scattering)** vs. **oil-contaminated vegetation/soil (double-bounce)** |
+| **Coherence / Interferometry (InSAR)** | Phase stability over time                                | Identifies **structural changes** in vegetation and land surfaces before visible degradation occurs                      |
 
 ---
 
