@@ -82,6 +82,25 @@
           </select>
         </div>
 
+        <div class="flex flex-col gap-1 text-sm bg-white text-black rounded px-3 py-2 min-w-[280px]">
+          <div class="flex justify-between items-center mb-1">
+            <label for="date-slider" class="font-medium text-xs">Image Date</label>
+            <span id="date-display" class="text-xs text-gray-600 font-semibold">{{ end_date or '2023-06-30' }}</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <input type="range" id="date-slider"
+                   min="0"
+                   max="4017"
+                   value="{{ days_from_start or 3164 }}"
+                   class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                   style="accent-color: #2563eb;">
+            <div class="flex justify-between text-xs text-gray-500">
+              <span>Oct 2014</span>
+              <span id="slider-date">{{ end_date or '2023-06-30' }}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="flex items-center gap-2">
           <button onclick="updateMap()" class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-50 transition text-sm">
             Update Map
@@ -133,7 +152,7 @@
 
     // Leaflet: start with scrollWheelZoom disabled so page scroll works normally
     const map = L.map('map', { zoomControl: true, scrollWheelZoom: false }).setView(mapCenter, DEFAULT_ZOOM);
-    L.tileLayer("{{ tile_url }}", { attribution: "Sentinel-1 SAR", maxZoom: 22 }).addTo(map);
+    let tileLayer = L.tileLayer("{{ tile_url }}", { attribution: "Sentinel-1 SAR", maxZoom: 22 }).addTo(map);
 
     // Fit bounds or center
     map.whenReady(() => {
@@ -160,12 +179,94 @@
       }
     }, { passive: true });
 
+    // Date slider functionality
+    const START_DATE = new Date('2014-10-01');
+    const dateSlider = document.getElementById('date-slider');
+    const dateDisplay = document.getElementById('date-display');
+    const sliderDate = document.getElementById('slider-date');
+    let updateTimeout = null;
+
+    function daysToDate(days) {
+      const date = new Date(START_DATE);
+      date.setDate(date.getDate() + parseInt(days));
+      return date.toISOString().split('T')[0];
+    }
+
+    function updateDateDisplay() {
+      const days = dateSlider.value;
+      const endDate = daysToDate(days);
+      sliderDate.textContent = endDate;
+      dateDisplay.textContent = endDate;  // Show only the selected date, not the range
+    }
+
+    // Function to fetch and update map tiles
+    async function updateMapTiles() {
+      if (!hasCoords) {
+        console.log('No coordinates set, skipping tile update');
+        return;
+      }
+
+      const pol = document.getElementById('polarization').value;
+      const mode = document.getElementById('mode').value;
+      const daysFromStart = dateSlider.value;
+
+      try {
+        const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${LAT_FROM_SERVER}&lng=${LNG_FROM_SERVER}&days_from_start=${encodeURIComponent(daysFromStart)}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          console.error('Failed to fetch tile URL:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.tile_url) {
+          // Remove old tile layer
+          if (tileLayer) {
+            map.removeLayer(tileLayer);
+          }
+
+          // Add new tile layer
+          tileLayer = L.tileLayer(data.tile_url, {
+            attribution: "Sentinel-1 SAR",
+            maxZoom: 22
+          }).addTo(map);
+
+          console.log('Map tiles updated for date range:', data.start_date, 'to', data.end_date);
+        } else {
+          console.warn('No tile URL available for selected date range');
+        }
+      } catch (error) {
+        console.error('Error updating map tiles:', error);
+      }
+    }
+
+    // Update display when slider moves (debounced for performance)
+    dateSlider.addEventListener('input', function() {
+      updateDateDisplay();
+
+      // Debounce the tile update to avoid too many requests while dragging
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
+
+      updateTimeout = setTimeout(() => {
+        updateMapTiles();
+      }, 500); // Wait 500ms after user stops dragging
+    });
+
+    // Initialize display
+    updateDateDisplay();
+
     function updateMap() {
       const pol = document.getElementById('polarization').value;
       const mode = document.getElementById('mode').value;
+      const daysFromStart = document.getElementById('date-slider').value;
       const latParam = hasCoords ? `&lat=${LAT_FROM_SERVER}` : '';
       const lngParam = hasCoords ? `&lng=${LNG_FROM_SERVER}` : '';
-      window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}`;
+      const dateParam = `&days_from_start=${encodeURIComponent(daysFromStart)}`;
+      window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}${dateParam}`;
     }
 
     // Describe — place markdown into gemini-wrapper and let it expand naturally.
