@@ -67,7 +67,7 @@ def send_danger_alert(notifier, email, x, y):
 # Poll Function
 def poll_and_notify(csv_file, server_url):
     """Run through all registrants and notify if in danger zone."""
-    with open('./secrets.json') as file:
+    with open('vite-project/secrets.json') as file:
         d = json.load(file)
     smtp_notifier = SMTPNotifier("smtp.gmail.com", 587, d['email_user'], d['email_pwd'])
     registrants = get_registrants(csv_file)
