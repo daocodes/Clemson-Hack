@@ -25,8 +25,8 @@ client = genai.Client(api_key=API_KEY)
 MODEL_NAME = "gemini-2.0-flash"
 
 
-def get_tile_url(lat, lng, polarization="VV", mode="IW"):
-    """Return a map tile URL for the specified polarization, mode, and coordinates."""
+def get_tile_url(lat, lng, polarization="VV", mode="IW", start_date="2023-06-01", end_date="2023-06-30"):
+    """Return a map tile URL for the specified polarization, mode, date range, and coordinates."""
     if not EE_OK:
         app.logger.warning("get_tile_url called but Earth Engine not initialized.")
         return None
@@ -47,19 +47,21 @@ def get_tile_url(lat, lng, polarization="VV", mode="IW"):
     collection = (
         ee.ImageCollection("COPERNICUS/S1_GRD")
         .filterBounds(point)
-         .filterDate("2023-06-01", "2023-06-30")
+        .filterDate(start_date, end_date)
         .filter(ee.Filter.eq("instrumentMode", mode))
         .filter(ee.Filter.listContains("transmitterReceiverPolarisation", polarization))
+        .sort('system:time_start', False)  # Sort by date descending (most recent first)
     )
 
-    image = collection.first()
+    image = collection.first()  # Now this gets the MOST RECENT image
     if not image:
         app.logger.debug(
-            "No SAR image found for the given filters at %s,%s", lat_f, lng_f
+            "No SAR image found for the given filters at %s,%s for dates %s to %s",
+            lat_f, lng_f, start_date, end_date
         )
         return None
 
-    vis_params = {"bands": ["VV"], "min": -25, "max": 0}
+    vis_params = {"bands": [polarization], "min": -25, "max": 0}
     try:
         map_id_dict = ee.Image(image).getMapId(vis_params)
         return map_id_dict["tile_fetcher"].url_format
@@ -75,21 +77,41 @@ def analysis():
     lngBig = request.args.get("lng")
     mode = request.args.get("mode", "IW")
 
+    # Handle date slider - convert days from start to actual dates
+    days_from_start = request.args.get("days_from_start")
+    start_date = "2014-10-01"  # Fixed start date (Sentinel-1 launch)
+
+    if days_from_start:
+        try:
+            days = int(days_from_start)
+            from datetime import datetime, timedelta
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = start_dt + timedelta(days=days)
+            end_date = end_dt.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            end_date = "2023-06-30"
+            days_from_start = 3164
+    else:
+        end_date = "2023-06-30"
+        days_from_start = 3164
+
     app.logger.info(
-        "Analysis request: pol=%s mode=%s lat=%s lng=%s",
+        "Analysis request: pol=%s mode=%s lat=%s lng=%s dates=%s to %s (days=%s)",
         polarization,
         mode,
         latBig,
         lngBig,
+        start_date,
+        end_date,
+        days_from_start,
     )
 
-    # ---- FIX: call get_tile_url with correct params ----
-    # Use positional call or correct keyword names
-    tile_url = get_tile_url(latBig, lngBig, polarization, mode)
+    # Call get_tile_url with date parameters
+    tile_url = get_tile_url(latBig, lngBig, polarization, mode, start_date, end_date)
 
     message = ""
     if not tile_url:
-        message = "No image found for the selected polarization/mode."
+        message = "No image found for the selected polarization/mode/date range."
 
     return render_template(
         "analysis.html",
@@ -98,6 +120,9 @@ def analysis():
         lng=lngBig,
         polarization=polarization,
         mode=mode,
+        start_date=start_date,
+        end_date=end_date,
+        days_from_start=days_from_start,
         message=message,
     )
 
@@ -154,6 +179,39 @@ def describe():
 @app.route("/historical")
 def historical():
     return render_template("historical.html")
+
+
+@app.route("/get_tile_url")
+def get_tile_url_endpoint():
+    """API endpoint to get tile URL dynamically without page reload."""
+    polarization = request.args.get("polarization", "VV")
+    lat = request.args.get("lat")
+    lng = request.args.get("lng")
+    mode = request.args.get("mode", "IW")
+    days_from_start = request.args.get("days_from_start")
+
+    start_date = "2014-10-01"
+
+    if days_from_start:
+        try:
+            days = int(days_from_start)
+            from datetime import datetime, timedelta
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = start_dt + timedelta(days=days)
+            end_date = end_dt.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            end_date = "2023-06-30"
+    else:
+        end_date = "2023-06-30"
+
+    tile_url = get_tile_url(lat, lng, polarization, mode, start_date, end_date)
+
+    return jsonify({
+        "tile_url": tile_url,
+        "start_date": start_date,
+        "end_date": end_date,
+        "success": tile_url is not None
+    })
 
 
 @app.route("/incidents.csv")
