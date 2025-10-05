@@ -343,6 +343,9 @@
 
     // ---------------- Auto-update SAR tiles on viewport change ----------------
     let sarUpdateTimeout = null;
+    let sarFetchInProgress = false;
+    let lastSARFetchTime = 0;
+    const MIN_SAR_FETCH_INTERVAL = 2000; // Minimum 2 seconds between SAR fetches
 
     function onViewportChange() {
       const center = sarMap.getCenter();
@@ -364,7 +367,28 @@
       }
 
       sarUpdateTimeout = setTimeout(() => {
-        updateSARTilesForLocation(lat, lon);
+        // Check if enough time has passed since last fetch
+        const now = Date.now();
+        const timeSinceLastFetch = now - lastSARFetchTime;
+
+        if (sarFetchInProgress) {
+          console.log('SAR fetch already in progress, skipping...');
+          return;
+        }
+
+        if (timeSinceLastFetch < MIN_SAR_FETCH_INTERVAL) {
+          const remainingTime = MIN_SAR_FETCH_INTERVAL - timeSinceLastFetch;
+          console.log(`Delaying SAR fetch by ${remainingTime}ms to prevent network congestion`);
+
+          // Schedule the fetch after the minimum interval
+          setTimeout(() => {
+            if (!sarFetchInProgress) {
+              updateSARTilesForLocation(lat, lon);
+            }
+          }, remainingTime);
+        } else {
+          updateSARTilesForLocation(lat, lon);
+        }
       }, 1000); // Wait 1 second after user stops panning
     }
 
@@ -472,6 +496,13 @@
     }
 
     async function updateSARTilesForLocation(lat, lon) {
+      // Prevent simultaneous fetches
+      if (sarFetchInProgress) {
+        console.log('SAR fetch already in progress, request ignored');
+        return;
+      }
+
+      sarFetchInProgress = true;
       const pol = document.getElementById('polarization').value;
       const mode = document.getElementById('mode').value;
       const daysFromStart = dateSlider.value;
@@ -511,6 +542,10 @@
         }
       } catch (error) {
         console.error('Error updating SAR tiles:', error);
+      } finally {
+        // Always clear the flag and update the timestamp when done
+        sarFetchInProgress = false;
+        lastSARFetchTime = Date.now();
       }
     }
 
