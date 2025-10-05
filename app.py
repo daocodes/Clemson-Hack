@@ -216,8 +216,8 @@ def get_tile_url_endpoint():
 
 @app.route("/incidents.csv")
 def incidents_csv():
-    """Serve the incidents.csv file from the parent directory."""
-    csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "incidents.csv")
+    """Serve the incidents.csv file from the project directory."""
+    csv_path = os.path.join(os.path.dirname(__file__), "incidents.csv")
     if os.path.exists(csv_path):
         return send_file(csv_path, mimetype='text/csv')
     else:
