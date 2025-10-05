@@ -25,7 +25,7 @@ client = genai.Client(api_key=API_KEY)
 MODEL_NAME = "gemini-2.0-flash"
 
 
-def get_tile_url(lat, lng, polarization="VV", mode="IW", start_date="2023-06-01", end_date="2023-06-30"):
+def get_tile_url(lat, lng, polarization="VV", mode="IW", start_date="2023-06-01", end_date="2025-10-04"):
     """Return a map tile URL for the specified polarization, mode, date range, and coordinates."""
     if not EE_OK:
         app.logger.warning("get_tile_url called but Earth Engine not initialized.")
@@ -89,10 +89,10 @@ def analysis():
             end_dt = start_dt + timedelta(days=days)
             end_date = end_dt.strftime("%Y-%m-%d")
         except (ValueError, TypeError):
-            end_date = "2023-06-30"
+            end_date = "2025-10-04"
             days_from_start = 3164
     else:
-        end_date = "2023-06-30"
+        end_date = "2025-10-04"
         days_from_start = 3164
 
     app.logger.info(
@@ -200,9 +200,9 @@ def get_tile_url_endpoint():
             end_dt = start_dt + timedelta(days=days)
             end_date = end_dt.strftime("%Y-%m-%d")
         except (ValueError, TypeError):
-            end_date = "2023-06-30"
+            end_date = "2025-10-04"
     else:
-        end_date = "2023-06-30"
+        end_date = "2025-10-04"
 
     tile_url = get_tile_url(lat, lng, polarization, mode, start_date, end_date)
 
@@ -244,10 +244,10 @@ def index():
             end_dt = start_dt + timedelta(days=days)
             end_date = end_dt.strftime("%Y-%m-%d")
         except (ValueError, TypeError):
-            end_date = "2023-06-30"
+            end_date = "2025-10-04"
             days_from_start = 3164
     else:
-        end_date = "2023-06-30"
+        end_date = "2025-10-04"
         days_from_start = 3164
 
     app.logger.info(
