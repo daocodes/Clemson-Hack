@@ -100,7 +100,7 @@
 <body class="min-h-screen bg-gray-50 text-gray-900 font-sans">
 
 <!-- Sticky header -->
-<header class="bg-blue-600 text-white shadow z-50">
+<header class="bg-gray-600 text-white shadow z-50">
     <div class="max-w-screen-xl mx-auto h-full flex items-center gap-4 px-4">
         <h1 class="text-sm md:text-base font-semibold tracking-wide">Sentinel-1 SAR Viewer</h1>
 
@@ -124,7 +124,7 @@
             <!-- Date slider (replaces date picker) -->
             <div class="flex flex-col gap-1 text-sm bg-white text-black rounded px-3 py-2 min-w-[200px]">
                 <label for="date-slider" class="font-medium text-xs">Max Date: <span id="slider-date">2025-10-04</span></label>
-                <input id="date-slider" type="range" min="0" max="3164"
+                <input id="date-slider" type="range" min="0" max="4023"
                        value="{{ days_from_start if days_from_start else 3164 }}" class="w-full"/>
             </div>
 
@@ -137,8 +137,6 @@
                         class="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 transition">
                     Describe SAR Plot
                 </button>
-            </div>
-            <div class="flex items-center gap-2">
                 <button onclick="subscribe()"
                         class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-50 transition text-sm">
                     Be Alerted
