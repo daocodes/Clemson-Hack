@@ -161,10 +161,34 @@
             const lat = parseFloat(incident.lat);
             const lon = parseFloat(incident.lon);
             
-            // Create marker element
+            // Get the oil spill amount and calculate marker size
+            const spillAmount = parseFloat(incident.max_ptl_release_gallons) || 0;
+
+            // Scale marker size based on spill amount
+            // Using tiered scale for better visualization
+            // Base size: 8px for incidents with no data or small spills
+            // Max size: 32px for large spills (100,000+ gallons)
+            let markerSize;
+            if (spillAmount === 0) {
+              markerSize = 8; // Small for unknown/no spill
+            } else if (spillAmount < 100) {
+              markerSize = 10;
+            } else if (spillAmount < 1000) {
+              markerSize = 14;
+            } else if (spillAmount < 10000) {
+              markerSize = 18;
+            } else if (spillAmount < 100000) {
+              markerSize = 24;
+            } else {
+              markerSize = 32; // Large spills
+            }
+
+            // Create marker element with dynamic size
             const el = document.createElement('div');
             el.className = 'incident-marker';
-            
+            el.style.width = `${markerSize}px`;
+            el.style.height = `${markerSize}px`;
+
             // Determine color based on threat type
             if (incident.threat === 'Oil') {
               el.style.background = '#ff4d4f';
@@ -174,7 +198,11 @@
               el.style.background = '#1890ff';
             }
 
-            // Create popup content
+            // Create popup content with formatted spill amount
+            const spillInfo = spillAmount > 0
+              ? `<p class="text-xs mb-1"><b>Max Release:</b> ${spillAmount.toLocaleString()} gal</p>`
+              : '';
+
             const popupHTML = `
               <div class="p-2">
                 <h3 class="font-bold text-sm mb-1">${incident.name || 'Unnamed Incident'}</h3>
@@ -182,7 +210,7 @@
                 <p class="text-xs mb-1"><b>Date:</b> ${incident.open_date || 'Unknown'}</p>
                 <p class="text-xs mb-1"><b>Threat:</b> ${incident.threat || 'Unknown'}</p>
                 ${incident.commodity ? `<p class="text-xs mb-1"><b>Commodity:</b> ${incident.commodity}</p>` : ''}
-                ${incident.max_ptl_release_gallons ? `<p class="text-xs mb-1"><b>Max Release:</b> ${incident.max_ptl_release_gallons} gal</p>` : ''}
+                ${spillInfo}
                 ${incident.description ? `<p class="text-xs mt-2 max-h-20 overflow-y-auto">${incident.description.substring(0, 200)}${incident.description.length > 200 ? '...' : ''}</p>` : ''}
                 <a href="/analysis?lat=${lat}&lng=${lon}" target="_blank" class="text-blue-600 text-xs mt-2 inline-block">
                   View Analysis →
