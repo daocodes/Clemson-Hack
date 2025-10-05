@@ -1,0 +1,6 @@
+earthengine_api==1.6.10
+Flask==3.1.2
+ipython==9.6.0
+protobuf==6.32.1
+google-genai==1.41.0
+google==3.0.0
