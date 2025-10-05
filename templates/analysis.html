@@ -377,6 +377,7 @@
                     // Base size: 8px for incidents with no data or small spills
                     // Max size: 32px for large spills (100,000+ gallons)
                     let markerSize;
+                    let radiusLength=0;
                     if (spillAmount === 0) {
                         markerSize = 8; // Small for unknown/no spill
                     } else if (spillAmount < 100) {
@@ -389,11 +390,20 @@
                         markerSize = 24;
                     } else {
                         markerSize = 32; // Large spills
+                        radiusLength=50;
                     }
 
                     // Create custom marker icon with dynamic size
                     const customIcon = L.divIcon({
                         html: `<div class="incident-marker" style="width: ${markerSize}px; height: ${markerSize}px;"></div>`,
+                        className: '',
+                        iconSize: [markerSize, markerSize],
+                        iconAnchor: [markerSize/2, markerSize/2]
+                    });
+
+                    // Create custom marker icon with dynamic size
+                    const customRadius = L.divIcon({
+                        html: `<div class="incident-marker" style="width: ${radiusLength}px; height: ${radiusLength}px;"></div>`,
                         className: '',
                         iconSize: [markerSize, markerSize],
                         iconAnchor: [markerSize/2, markerSize/2]
