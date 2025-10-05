@@ -119,17 +119,115 @@
     const LNG_FROM_SERVER = parseFloat('{{ lng if lng is not none else -90.0715 }}');
     const BBOX = JSON.parse('{{ bbox | tojson if bbox is defined else "[]" }}');
     const hasCoords = !Number.isNaN(LAT_FROM_SERVER) && !Number.isNaN(LNG_FROM_SERVER);
+    const mapCenter = hasCoords ? [LAT_FROM_SERVER, LNG_FROM_SERVER] : DEFAULT_CENTER;
+
+    // Leaflet: start with scrollWheelZoom disabled so page scroll works normally
+    const map = L.map('map', { zoomControl: true, scrollWheelZoom: false }).setView(mapCenter, DEFAULT_ZOOM);
+    let tileLayer = L.tileLayer("{{ tile_url }}", { attribution: "Sentinel-1 SAR", maxZoom: 22 }).addTo(map);
+
+    // Fit bounds or center
+    map.whenReady(() => {
+      if (Array.isArray(BBOX) && BBOX.length === 4) {
+        const sw = [BBOX[0], BBOX[1]];
+        const ne = [BBOX[2], BBOX[3]];
+        map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
+      } else if (hasCoords) {
+        map.setView(mapCenter, 12);
+      } else {
+        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      }
 
     const DEFAULT_CENTER = hasCoords ? [LAT_FROM_SERVER, LNG_FROM_SERVER] : [29.9511, -90.0715];
     const DEFAULT_ZOOM = 9;
 
-    // ---------------- Helpers ----------------
+    // Date slider functionality
+    const START_DATE = new Date('2014-10-01');
+    const dateSlider = document.getElementById('date-slider');
+    const dateDisplay = document.getElementById('date-display');
+    const sliderDate = document.getElementById('slider-date');
+    let updateTimeout = null;
+
+    function daysToDate(days) {
+      const date = new Date(START_DATE);
+      date.setDate(date.getDate() + parseInt(days));
+      return date.toISOString().split('T')[0];
+    }
+
+    function updateDateDisplay() {
+      const days = dateSlider.value;
+      const endDate = daysToDate(days);
+      sliderDate.textContent = endDate;
+      dateDisplay.textContent = endDate;  // Show only the selected date, not the range
+    }
+
+    // Function to fetch and update map tiles
+    async function updateMapTiles() {
+      if (!hasCoords) {
+        console.log('No coordinates set, skipping tile update');
+        return;
+      }
+
+      const pol = document.getElementById('polarization').value;
+      const mode = document.getElementById('mode').value;
+      const daysFromStart = dateSlider.value;
+
+      try {
+        const url = `/get_tile_url?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}&lat=${LAT_FROM_SERVER}&lng=${LNG_FROM_SERVER}&days_from_start=${encodeURIComponent(daysFromStart)}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          console.error('Failed to fetch tile URL:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.tile_url) {
+          // Remove old tile layer
+          if (tileLayer) {
+            map.removeLayer(tileLayer);
+          }
+
+          // Add new tile layer
+          tileLayer = L.tileLayer(data.tile_url, {
+            attribution: "Sentinel-1 SAR",
+            maxZoom: 22
+          }).addTo(map);
+
+          console.log('Map tiles updated for date range:', data.start_date, 'to', data.end_date);
+        } else {
+          console.warn('No tile URL available for selected date range');
+        }
+      } catch (error) {
+        console.error('Error updating map tiles:', error);
+      }
+    }
+
+    // Update display when slider moves (debounced for performance)
+    dateSlider.addEventListener('input', function() {
+      updateDateDisplay();
+
+      // Debounce the tile update to avoid too many requests while dragging
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
+
+      updateTimeout = setTimeout(() => {
+        updateMapTiles();
+      }, 500); // Wait 500ms after user stops dragging
+    });
+
+    // Initialize display
+    updateDateDisplay();
+
     function updateMap() {
       const pol = document.getElementById('polarization').value;
       const mode = document.getElementById('mode').value;
+      const daysFromStart = document.getElementById('date-slider').value;
       const latParam = hasCoords ? `&lat=${LAT_FROM_SERVER}` : '';
       const lngParam = hasCoords ? `&lng=${LNG_FROM_SERVER}` : '';
-      window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}`;
+      const dateParam = `&days_from_start=${encodeURIComponent(daysFromStart)}`;
+      window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}${dateParam}`;
     }
 
     function getSelectedDate() {
