@@ -226,8 +226,60 @@ def incidents_csv():
 
 @app.route("/")
 def index():
-    # If you want root to forward to analysis preserving no lat/lng:
-    return render_template("analysis.html")
+    # Use default coordinates (Gulf of Mexico) if none provided
+    latBig = request.args.get("lat", "29.9511")
+    lngBig = request.args.get("lng", "-90.0715")
+    polarization = request.args.get("polarization", "VV")
+    mode = request.args.get("mode", "IW")
+
+    # Handle date slider - convert days from start to actual dates
+    days_from_start = request.args.get("days_from_start")
+    start_date = "2014-10-01"  # Fixed start date (Sentinel-1 launch)
+
+    if days_from_start:
+        try:
+            days = int(days_from_start)
+            from datetime import datetime, timedelta
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = start_dt + timedelta(days=days)
+            end_date = end_dt.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            end_date = "2023-06-30"
+            days_from_start = 3164
+    else:
+        end_date = "2023-06-30"
+        days_from_start = 3164
+
+    app.logger.info(
+        "Index request: pol=%s mode=%s lat=%s lng=%s dates=%s to %s (days=%s)",
+        polarization,
+        mode,
+        latBig,
+        lngBig,
+        start_date,
+        end_date,
+        days_from_start,
+    )
+
+    # Call get_tile_url with date parameters and default coordinates
+    tile_url = get_tile_url(latBig, lngBig, polarization, mode, start_date, end_date)
+
+    message = ""
+    if not tile_url:
+        message = "No image found for the selected polarization/mode/date range."
+
+    return render_template(
+        "analysis.html",
+        tile_url=tile_url or "",
+        lat=latBig,
+        lng=lngBig,
+        polarization=polarization,
+        mode=mode,
+        start_date=start_date,
+        end_date=end_date,
+        days_from_start=days_from_start,
+        message=message,
+    )
 
 
 if __name__ == "__main__":
