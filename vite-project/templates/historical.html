@@ -14,11 +14,22 @@
 
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .map-popup-marker {
-      width: 12px; height: 12px; background: #ff4d4f; border-radius: 50%;
-      box-shadow: 0 0 0 2px rgba(255,77,79,0.25);
+    .incident-marker {
+      width: 14px;
+      height: 14px;
+      background: #ff4d4f;
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .incident-marker:hover {
+      transform: scale(1.2);
     }
     .control-panel { z-index: 1000; }
+    .maplibregl-popup-content {
+      max-width: 300px;
+    }
   </style>
 </head>
 <body class="h-full">
@@ -41,12 +52,17 @@
         <div class="mt-2">
           <button id="centerBtn" class="px-3 py-1 bg-blue-600 text-white rounded">Center Home</button>
         </div>
+        <div class="mt-2 text-xs text-gray-600">
+          <span id="incidentCount">Loading incidents...</span>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- MapLibre JS -->
   <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     // Replace with your SAR tile URL or OSM for testing
     const SAR_TILE_URL = "{{ tile_url or 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png' }}";
@@ -55,8 +71,8 @@
     const LAT_FROM_SERVER = "{{ lat if lat is not none else '' }}";
     const LNG_FROM_SERVER = "{{ lng if lng is not none else '' }}";
 
-    // defaults
-    const HOME = { lng: -90.0715, lat: 29.9511, zoom: 12 };
+    // defaults - centered on USA to show all incidents
+    const HOME = { lng: -95.0, lat: 37.0, zoom: 4 };
 
     function parseCoord(val) {
       if (!val && val !== 0) return null;
@@ -84,7 +100,7 @@
         layers: [{ id: 'base', type: 'raster', source: 'base' }]
       },
       center: initialCenter,
-      zoom: HOME.zoom
+      zoom: latVal !== null && lngVal !== null ? 12 : HOME.zoom
     });
 
     // Add controls
@@ -95,6 +111,9 @@
       showUserLocation: true
     });
     map.addControl(geo, 'top-right');
+
+    // Store markers
+    const markers = [];
 
     // When map loads, add SAR raster source & layer
     map.on('load', () => {
@@ -110,15 +129,89 @@
         console.warn('Could not add SAR layer:', err);
       }
 
+      // Load and plot incidents
+      loadIncidents();
+
       // ensure map is resized and centered correctly
       setTimeout(() => {
         map.resize();
         if (latVal !== null && lngVal !== null) {
           map.setCenter([lngVal, latVal]);
-          map.flyTo({ center: [lngVal, latVal], zoom: HOME.zoom });
+          map.flyTo({ center: [lngVal, latVal], zoom: 12 });
         }
       }, 250);
     });
+
+    // Function to load incidents from CSV
+    function loadIncidents() {
+      Papa.parse('/incidents.csv', {
+        download: true,
+        header: true,
+        complete: function(results) {
+          const incidents = results.data.filter(row => {
+            const lat = parseFloat(row.lat);
+            const lon = parseFloat(row.lon);
+            return !isNaN(lat) && !isNaN(lon);
+          });
+
+          document.getElementById('incidentCount').textContent =
+            `${incidents.length} incidents loaded`;
+
+          incidents.forEach(incident => {
+            const lat = parseFloat(incident.lat);
+            const lon = parseFloat(incident.lon);
+
+            // Create marker element
+            const el = document.createElement('div');
+            el.className = 'incident-marker';
+
+            // Determine color based on threat type
+            if (incident.threat === 'Oil') {
+              el.style.background = '#ff4d4f';
+            } else if (incident.threat === 'Chemical') {
+              el.style.background = '#ff7a00';
+            } else {
+              el.style.background = '#1890ff';
+            }
+
+            // Create popup content
+            const popupHTML = `
+              <div class="p-2">
+                <h3 class="font-bold text-sm mb-1">${incident.name || 'Unnamed Incident'}</h3>
+                <p class="text-xs text-gray-600 mb-2">${incident.location || 'Unknown location'}</p>
+                <p class="text-xs mb-1"><b>Date:</b> ${incident.open_date || 'Unknown'}</p>
+                <p class="text-xs mb-1"><b>Threat:</b> ${incident.threat || 'Unknown'}</p>
+                ${incident.commodity ? `<p class="text-xs mb-1"><b>Commodity:</b> ${incident.commodity}</p>` : ''}
+                ${incident.max_ptl_release_gallons ? `<p class="text-xs mb-1"><b>Max Release:</b> ${incident.max_ptl_release_gallons} gal</p>` : ''}
+                ${incident.description ? `<p class="text-xs mt-2 max-h-20 overflow-y-auto">${incident.description.substring(0, 200)}${incident.description.length > 200 ? '...' : ''}</p>` : ''}
+                <a href="/analysis?lat=${lat}&lng=${lon}" target="_blank" class="text-blue-600 text-xs mt-2 inline-block">
+                  View Analysis →
+                </a>
+              </div>
+            `;
+
+            // Create popup
+            const popup = new maplibregl.Popup({
+              offset: 25,
+              maxWidth: '300px'
+            }).setHTML(popupHTML);
+
+            // Create marker
+            const marker = new maplibregl.Marker({ element: el })
+              .setLngLat([lon, lat])
+              .setPopup(popup)
+              .addTo(map);
+
+            markers.push(marker);
+          });
+        },
+        error: function(error) {
+          console.error('Error loading incidents:', error);
+          document.getElementById('incidentCount').textContent =
+            'Error loading incidents';
+        }
+      });
+    }
 
     // click => popup + marker
     map.on('click', (e) => {

@@ -3,7 +3,7 @@ import os
 import traceback
 
 import ee
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
 from google import genai
 
 app = Flask(__name__)
@@ -154,6 +154,16 @@ def describe():
 @app.route("/historical")
 def historical():
     return render_template("historical.html")
+
+
+@app.route("/incidents.csv")
+def incidents_csv():
+    """Serve the incidents.csv file from the parent directory."""
+    csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "incidents.csv")
+    if os.path.exists(csv_path):
+        return send_file(csv_path, mimetype='text/csv')
+    else:
+        return "incidents.csv not found", 404
 
 
 @app.route("/")
