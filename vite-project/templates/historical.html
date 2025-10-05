@@ -15,9 +15,9 @@
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     .incident-marker {
-      width: 14px;
-      height: 14px;
-      background: #ff4d4f;
+      width: 14px; 
+      height: 14px; 
+      background: #ff4d4f; 
       border: 2px solid white;
       border-radius: 50%;
       cursor: pointer;
@@ -154,17 +154,17 @@
             return !isNaN(lat) && !isNaN(lon);
           });
 
-          document.getElementById('incidentCount').textContent =
+          document.getElementById('incidentCount').textContent = 
             `${incidents.length} incidents loaded`;
 
           incidents.forEach(incident => {
             const lat = parseFloat(incident.lat);
             const lon = parseFloat(incident.lon);
-
+            
             // Create marker element
             const el = document.createElement('div');
             el.className = 'incident-marker';
-
+            
             // Determine color based on threat type
             if (incident.threat === 'Oil') {
               el.style.background = '#ff4d4f';
@@ -191,7 +191,7 @@
             `;
 
             // Create popup
-            const popup = new maplibregl.Popup({
+            const popup = new maplibregl.Popup({ 
               offset: 25,
               maxWidth: '300px'
             }).setHTML(popupHTML);
@@ -207,7 +207,7 @@
         },
         error: function(error) {
           console.error('Error loading incidents:', error);
-          document.getElementById('incidentCount').textContent =
+          document.getElementById('incidentCount').textContent = 
             'Error loading incidents';
         }
       });
