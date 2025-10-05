@@ -17,44 +17,18 @@
 
   <style>
     :root { --header-h: 4rem; }
-
-    /* keep header fixed at top */
-    header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: var(--header-h);
-      z-index: 10000; /* ensure header sits above Leaflet & everything */
-    }
-
-    /* main content gets top padding so nothing sits under the header */
+    header { position: fixed; top: 0; left: 0; right: 0; height: var(--header-h); z-index: 10000; }
     main { padding-top: var(--header-h); }
-
-    /*
-      Give the map an initial visible height (so users see a large map),
-      but don't lock the rest of the page — the page will grow as gemini-wrapper expands.
-      You can tweak the 60vh below to taste (e.g., 55vh or 70vh).
-    */
-    #map {
-      width: 100%;
-      height: calc(60vh - var(--header-h)); /* initial map height */
+    .map-panel {
+      height: calc(60vh - var(--header-h));
       min-height: 320px;
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-
-    /* Gemini now grows with content (no fixed height) */
-    #gemini-wrapper {
-      padding: 1rem;
-      background: #f3f4f6; /* Tailwind's gray-100 */
-      /* remove fixed height and overflow-y: auto so the div expands */
-      height: auto;
-      overflow: visible;
-    }
-
-    /* Keep footer at document flow (after gemini) */
+    #gemini-wrapper { padding: 1rem; background: #f3f4f6; height: auto; overflow: visible; }
     footer { position: relative; }
-
-    /* ensure images in the markdown are responsive */
     .prose img { max-width: 100%; height: auto; display: block; }
   </style>
 </head>
@@ -82,6 +56,12 @@
           </select>
         </div>
 
+        <!-- Optical date picker (user-provided date for GIBS) -->
+        <div class="flex items-center gap-2 text-sm bg-white text-black rounded px-2 py-1">
+          <label for="optical-date" class="font-medium text-xs md:text-sm mr-1">Date</label>
+          <input id="optical-date" type="date" class="border rounded px-2 py-1 text-sm" />
+        </div>
+
         <div class="flex items-center gap-2">
           <button onclick="updateMap()" class="bg-white text-blue-600 font-medium px-3 py-1 rounded hover:bg-blue-50 transition text-sm">
             Update Map
@@ -105,12 +85,25 @@
 
   <!-- Main content -->
   <main>
-    <!-- Map (initial fixed-ish height, but page can grow below) -->
-    <div id="map" class="border-b border-gray-300"></div>
+    <!-- Three side-by-side maps -->
+    <div id="map-container" class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3">
+      <div>
+        <div class="text-center text-xs font-medium mb-1">SAR (Sentinel-1)</div>
+        <div id="map-sar" class="map-panel"></div>
+      </div>
+      <div>
+        <div class="text-center text-xs font-medium mb-1">Optical (NASA GIBS True Color)</div>
+        <div id="map-optical" class="map-panel"></div>
+      </div>
+      <div>
+        <div class="text-center text-xs font-medium mb-1">Topographical (OpenTopoMap)</div>
+        <div id="map-topo" class="map-panel"></div>
+      </div>
+    </div>
 
-    <!-- Gemini output: now grows naturally with content -->
+    <!-- Gemini output -->
     <div id="gemini-wrapper" class="prose prose-sm max-w-none">
-      Click “Describe SAR Plot” to get a description.
+      Click a map (or “Describe SAR Plot”) to get a description.
     </div>
 
     <!-- Footer -->
@@ -121,45 +114,16 @@
   </main>
 
   <script>
-    // Server values
+    // ---------------- Server-provided values ----------------
     const LAT_FROM_SERVER = parseFloat('{{ lat if lat is not none else 29.9511 }}');
     const LNG_FROM_SERVER = parseFloat('{{ lng if lng is not none else -90.0715 }}');
     const BBOX = JSON.parse('{{ bbox | tojson if bbox is defined else "[]" }}');
-
-    const DEFAULT_CENTER = [29.9511, -90.0715];
-    const DEFAULT_ZOOM = 9;
     const hasCoords = !Number.isNaN(LAT_FROM_SERVER) && !Number.isNaN(LNG_FROM_SERVER);
-    const mapCenter = hasCoords ? [LAT_FROM_SERVER, LNG_FROM_SERVER] : DEFAULT_CENTER;
 
-    // Leaflet: start with scrollWheelZoom disabled so page scroll works normally
-    const map = L.map('map', { zoomControl: true, scrollWheelZoom: false }).setView(mapCenter, DEFAULT_ZOOM);
-    L.tileLayer("{{ tile_url }}", { attribution: "Sentinel-1 SAR", maxZoom: 22 }).addTo(map);
+    const DEFAULT_CENTER = hasCoords ? [LAT_FROM_SERVER, LNG_FROM_SERVER] : [29.9511, -90.0715];
+    const DEFAULT_ZOOM = 9;
 
-    // Fit bounds or center
-    map.whenReady(() => {
-      if (Array.isArray(BBOX) && BBOX.length === 4) {
-        const sw = [BBOX[0], BBOX[1]];
-        const ne = [BBOX[2], BBOX[3]];
-        map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
-      } else if (hasCoords) {
-        map.setView(mapCenter, 12);
-      } else {
-        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-      }
-
-      // ensure correct sizing after render
-      setTimeout(() => map.invalidateSize(), 200);
-    });
-
-    // enable ctrl+wheel for zooming if user wants it
-    window.addEventListener('wheel', (e) => {
-      if (e.ctrlKey) {
-        if (!map.scrollWheelZoom.enabled()) map.scrollWheelZoom.enable();
-      } else {
-        if (map.scrollWheelZoom.enabled()) map.scrollWheelZoom.disable();
-      }
-    }, { passive: true });
-
+    // ---------------- Helpers ----------------
     function updateMap() {
       const pol = document.getElementById('polarization').value;
       const mode = document.getElementById('mode').value;
@@ -168,37 +132,221 @@
       window.location.href = `/?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}${latParam}${lngParam}`;
     }
 
-    // Describe — place markdown into gemini-wrapper and let it expand naturally.
-    document.getElementById('describe-btn').addEventListener('click', async () => {
-      const pol = document.getElementById('polarization').value;
-      const mode = document.getElementById('mode').value;
+    function getSelectedDate() {
+      const input = document.getElementById('optical-date');
+      if (!input || !input.value) {
+        const today = new Date();
+        const yyyy = today.getUTCFullYear();
+        const mm = String(today.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(today.getUTCDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      return input.value;
+    }
+
+    // ---------------- Build three maps ----------------
+    // SAR
+    const sarMap = L.map('map-sar', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    const sarLayer = L.tileLayer("{{ tile_url }}", { attribution: "Sentinel-1 SAR", maxZoom: 22 }).addTo(sarMap);
+
+    // ---- OPTICAL (robust loader) ----
+const opticalMap = L.map('map-optical', { zoomControl: true, minZoom: 2, maxZoom: 9 })
+  .setView(DEFAULT_CENTER, 5);
+
+let opticalLayer;
+
+// Build a GIBS WMTS URL for a given layer + date
+function gibsUrl(layer, date) {
+  // XYZ order is {z}/{y}/{x} for GoogleMapsCompatible_Level9
+  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+}
+
+// Static fallback (global, no date): Sentinel-2 cloudless (EOX)
+const S2CLOUDLESS_URL =
+  "https://tiles.maps.eox.at/wms?service=WMTS&request=GetTile&version=1.0.0" +
+  "&layer=s2cloudless-2020&style=default&tilematrixset=GoogleMapsCompatible" +
+  "&TileMatrix={z}&TileCol={x}&TileRow={y}&format=image/jpeg";
+
+function loadOpticalForDate(dateStr) {
+  // remove previous optical layer if present
+  if (opticalLayer) {
+    opticalMap.removeLayer(opticalLayer);
+    opticalLayer.off("tileerror");
+  }
+
+  // try these layers in order
+  const candidates = [
+    { id: "VIIRS_SNPP_CorrectedReflectance_TrueColor", name: "VIIRS SNPP True Color" },
+    { id: "MODIS_Terra_CorrectedReflectance_TrueColor", name: "MODIS Terra True Color" },
+    { id: "MODIS_Aqua_CorrectedReflectance_TrueColor", name: "MODIS Aqua True Color" },
+  ];
+
+  let idx = 0;
+
+  function tryNext(reason) {
+    if (idx < candidates.length) {
+      const layer = candidates[idx++];
+      const url = gibsUrl(layer.id, dateStr);
+      console.log(`[Optical] Trying ${layer.name} @ ${dateStr}${reason ? " after " + reason : ""}`);
+      opticalLayer = L.tileLayer(url, { attribution: "NASA GIBS", maxZoom: 9 }).addTo(opticalMap);
+
+      // If tiles fail (404/empty), switch to next candidate
+      opticalLayer.on("tileerror", () => {
+        opticalMap.removeLayer(opticalLayer);
+        tryNext(`tile error on ${layer.name}`);
+      });
+    } else {
+      // Fallback to S2 cloudless mosaic
+      console.warn("[Optical] All NASA layers failed; falling back to Sentinel-2 cloudless.");
+      opticalLayer = L.tileLayer(S2CLOUDLESS_URL, { attribution: "EOX • Sentinel-2 cloudless", maxZoom: 14 })
+        .addTo(opticalMap);
+    }
+  }
+
+  tryNext();
+}
+
+// Initial load using user-selected (or today) date
+let gibsDate = getSelectedDate();
+loadOpticalForDate(gibsDate);
+
+// When the date changes, reload optical tiles
+document.getElementById('optical-date').addEventListener('change', () => {
+  gibsDate = getSelectedDate();
+  loadOpticalForDate(gibsDate);
+});
+
+
+    // Topographical
+    const topoMap = L.map('map-topo', { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenTopoMap • © OpenStreetMap contributors', maxZoom: 17
+    }).addTo(topoMap);
+
+    // Fit bounds if BBOX exists
+    function fitAllToBBox(bbox) {
+      const sw = [bbox[0], bbox[1]];
+      const ne = [bbox[2], bbox[3]];
+      const bounds = L.latLngBounds(sw, ne);
+      const opts = { padding: [20, 20] };
+      sarMap.fitBounds(bounds, opts);
+      opticalMap.fitBounds(bounds, opts);
+      topoMap.fitBounds(bounds, opts);
+    }
+    if (Array.isArray(BBOX) && BBOX.length === 4) {
+      fitAllToBBox(BBOX);
+    } else {
+      setTimeout(() => {
+        sarMap.invalidateSize();
+        opticalMap.invalidateSize();
+        topoMap.invalidateSize();
+      }, 200);
+    }
+
+    // ---------------- Sync maps ----------------
+    function syncMaps(source, targets) {
+      let isSyncing = false;
+      source.on('move', () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        const c = source.getCenter();
+        const z = source.getZoom();
+        targets.forEach(m => m.setView(c, m === opticalMap ? Math.min(z, 9) : z, { animate: false }));
+        isSyncing = false;
+      });
+    }
+    syncMaps(sarMap, [opticalMap, topoMap]);
+    syncMaps(opticalMap, [sarMap, topoMap]);
+    syncMaps(topoMap, [sarMap, opticalMap]);
+
+    // ---------------- Markers + click-to-explain ----------------
+    let currentLat = DEFAULT_CENTER[0];
+    let currentLon = DEFAULT_CENTER[1];
+
+    const sarMarker = L.marker(DEFAULT_CENTER).addTo(sarMap);
+    const opticalMarker = L.marker(DEFAULT_CENTER).addTo(opticalMap);
+    const topoMarker = L.marker(DEFAULT_CENTER).addTo(topoMap);
+
+    function setAllViews(lat, lon, zoom = null) {
+      const center = [lat, lon];
+      sarMarker.setLatLng(center);
+      opticalMarker.setLatLng(center);
+      topoMarker.setLatLng(center);
+
+      const z = zoom ?? sarMap.getZoom();
+      sarMap.setView(center, z, { animate: false });
+      opticalMap.setView(center, Math.min(z, 9), { animate: false });
+      topoMap.setView(center, z, { animate: false });
+
+      currentLat = lat;
+      currentLon = lon;
+    }
+
+    async function describeAt(lat, lon) {
+      const pol = document.getElementById('polarization')?.value || 'VV';
+      const mode = document.getElementById('mode')?.value || 'IW';
+
+      const geminiDiv = document.getElementById('gemini-wrapper');
+      geminiDiv.innerHTML = "<em>Generating overview…</em>";
+
       try {
-        const res = await fetch(`/describe?polarization=${encodeURIComponent(pol)}&mode=${encodeURIComponent(mode)}`);
+        const params = new URLSearchParams({
+          polarization: pol,
+          mode,
+          lat: String(lat),
+          lon: String(lon)
+          // If you later want to include the optical date in the AI prompt, add: date: getSelectedDate()
+        });
+        const res = await fetch(`/describe?${params.toString()}`);
         if (!res.ok) throw new Error(`Describe API returned ${res.status}`);
         const data = await res.json();
 
-        const geminiDiv = document.getElementById('gemini-wrapper');
-
-        // Replace content — this will expand the div naturally because height is auto.
         geminiDiv.innerHTML = marked.parse(data.description || "No description available.");
-
-        // A small timeout to allow layout paint, then ensure map redraws for any size shifts
         setTimeout(() => {
-          map.invalidateSize();
+          sarMap.invalidateSize(); opticalMap.invalidateSize(); topoMap.invalidateSize();
         }, 120);
-
-        // optionally scroll the new content into view:
-        // geminiDiv.scrollIntoView({ behavior: 'smooth' });
       } catch (err) {
         console.error(err);
-        const geminiDiv = document.getElementById('gemini-wrapper');
         geminiDiv.textContent = "Error fetching description.";
       }
+    }
+
+    function onAnyMapClick(e) {
+      const lat = +e.latlng.lat.toFixed(5);
+      const lon = +e.latlng.lng.toFixed(5);
+      const zoom = e.target.getZoom();
+      setAllViews(lat, lon, zoom);
+      describeAt(lat, lon);
+    }
+    sarMap.on('click', onAnyMapClick);
+    opticalMap.on('click', onAnyMapClick);
+    topoMap.on('click', onAnyMapClick);
+
+    document.getElementById('describe-btn')?.addEventListener('click', () => {
+      describeAt(currentLat, currentLon);
     });
 
-    // Ensure map redraws on window resize/orientation change
+    // ---------------- Optical date change -> reload GIBS tiles ----------------
+    document.getElementById('optical-date').addEventListener('change', () => {
+      gibsDate = getSelectedDate();
+      const newUrl =
+        `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/` +
+        `MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate}/` +
+        `GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+
+      // Replace the layer cleanly
+      if (opticalLayer) opticalMap.removeLayer(opticalLayer);
+      opticalLayer = L.tileLayer(newUrl, { attribution: "NASA GIBS • MODIS Terra", maxZoom: 9 }).addTo(opticalMap);
+
+      // Keep marker visible
+      opticalMarker.setLatLng([currentLat, currentLon]);
+    });
+
+    // ---------------- Window resize: keep maps crisp ----------------
     window.addEventListener('resize', () => {
-      setTimeout(() => map.invalidateSize(), 150);
+      setTimeout(() => {
+        sarMap.invalidateSize(); opticalMap.invalidateSize(); topoMap.invalidateSize();
+      }, 150);
     });
   </script>
 </body>
