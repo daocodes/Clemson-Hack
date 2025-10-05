@@ -369,22 +369,48 @@
                     const lat = parseFloat(incident.lat);
                     const lon = parseFloat(incident.lon);
 
-                    // Create custom marker icon
+                    // Get the oil spill amount and calculate marker size
+                    const spillAmount = parseFloat(incident.max_ptl_release_gallons) || 0;
+
+                    // Scale marker size based on spill amount
+                    // Using logarithmic scale for better visualization
+                    // Base size: 8px for incidents with no data or small spills
+                    // Max size: 32px for large spills (100,000+ gallons)
+                    let markerSize;
+                    if (spillAmount === 0) {
+                        markerSize = 8; // Small for unknown/no spill
+                    } else if (spillAmount < 100) {
+                        markerSize = 10;
+                    } else if (spillAmount < 1000) {
+                        markerSize = 14;
+                    } else if (spillAmount < 10000) {
+                        markerSize = 18;
+                    } else if (spillAmount < 100000) {
+                        markerSize = 24;
+                    } else {
+                        markerSize = 32; // Large spills
+                    }
+
+                    // Create custom marker icon with dynamic size
                     const customIcon = L.divIcon({
-                        html: '<div class="incident-marker"></div>',
+                        html: `<div class="incident-marker" style="width: ${markerSize}px; height: ${markerSize}px;"></div>`,
                         className: '',
-                        iconSize: [12, 12],
-                        iconAnchor: [6, 6]
+                        iconSize: [markerSize, markerSize],
+                        iconAnchor: [markerSize/2, markerSize/2]
                     });
 
                     // Create popup content
+                    const spillInfo = spillAmount > 0
+                        ? `<div style="font-size: 11px; margin-bottom: 3px;"><strong>Max Release:</strong> ${spillAmount.toLocaleString()} gal</div>`
+                        : '';
+
                     const popupHTML = `
               <div style="min-width: 200px; max-width: 280px;">
                 <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${incident.name || 'Unnamed Incident'}</div>
                 <div style="font-size: 11px; color: #666; margin-bottom: 8px;">${incident.location || 'Unknown location'}</div>
                 <div style="font-size: 11px; margin-bottom: 3px;"><strong>Date:</strong> ${incident.open_date || 'Unknown'}</div>
                 ${incident.commodity ? `<div style="font-size: 11px; margin-bottom: 3px;"><strong>Commodity:</strong> ${incident.commodity}</div>` : ''}
-                ${incident.max_ptl_release_gallons ? `<div style="font-size: 11px; margin-bottom: 3px;"><strong>Max Release:</strong> ${incident.max_ptl_release_gallons} gal</div>` : ''}
+                ${spillInfo}
                 ${incident.description ? `<div style="font-size: 11px; margin-top: 6px; max-height: 60px; overflow-y: auto;">${incident.description.substring(0, 150)}${incident.description.length > 150 ? '...' : ''}</div>` : ''}
               </div>
             `;
